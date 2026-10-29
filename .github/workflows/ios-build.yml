@@ -129,6 +129,44 @@ jobs:
         working-directory: esim_app/ios
         run: pod install --repo-update
 
+      # Toolchain workaround.
+      #
+      # shared_preferences_foundation ships Pigeon-generated Swift that ends an
+      # @objc initializer parameter list with a trailing comma:
+      #
+      #     @objc required init(
+      #       number: NSNumber,
+      #       type: Int,        <- trailing comma
+      #     ) {
+      #
+      # Trailing commas in @objc parameter lists are rejected by every Xcode on
+      # the runner images (verified on macos-14 default and newest Xcode), with
+      # "unexpected ',' separator" at messages.g.swift:33, :357 and :362.
+      # Selecting a newer Xcode did not help, so strip the offending commas from
+      # the cached package before the build runs.
+      #
+      # The file is generated output in the pub cache, not project source, so
+      # patching it here is safe and does not touch the repository.
+      - name: Patch plugin Swift for older toolchain
+        run: |
+          set -euo pipefail
+          PKG="$HOME/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.6.0"
+          TARGET="$PKG/darwin/shared_preferences_foundation/Sources/shared_preferences_foundation/messages.g.swift"
+          if [ ! -f "$TARGET" ]; then
+            echo "Target not found, searching pub cache:"
+            find "$HOME/.pub-cache/hosted" -maxdepth 3 -type d -name 'shared_preferences_foundation-*' || true
+            exit 1
+          fi
+          echo "Before: $(grep -c ',$' "$TARGET" || true) lines end with a comma"
+          # Remove a comma that is immediately followed by a closing paren.
+          # Done with perl -0777 so the match can span the newline, which keeps
+          # this free of any indentation-sensitive embedded script.
+          perl -0777 -i -pe 's/,\s*\n(\s*)\)/\n$1)/g' "$TARGET"
+          echo "After: $(grep -c ',$' "$TARGET" || true) lines end with a comma"
+          echo "Line 33 now: $(sed -n '33p' "$TARGET")"
+          echo "Line 357 now: $(sed -n '357p' "$TARGET")"
+          echo "Line 362 now: $(sed -n '362p' "$TARGET")"
+
       # ---------- unsigned ----------
       - name: Build iOS (unsigned)
         if: env.HAS_SIGNING != 'true'

@@ -1,0 +1,19 @@
+# Binary iOS SDK artefacts.
+#
+# The eSIMManagerSDK xcframework is a vendored closed-source binary (~34 MB,
+# main Mach-O ~27 MB). Tracked through Git LFS to keep the repository history
+# free of binary blobs.
+#
+# CI note: the workflow runs `git lfs pull` explicitly. Without that, checkout
+# leaves LFS pointer files and `Verify vendored SDK` fails loudly (by design).
+esim_app/ios/Frameworks/**/eSIMManagerSDK.xcframework/** filter=lfs diff=lfs merge=lfs -text
+esim_app/ios/Frameworks/**/*.a binary
+esim_app/ios/Frameworks/**/*.dylib binary
+esim_app/ios/Frameworks/**/*.framework/** binary
+esim_app/ios/Frameworks/**/*.xcframework/** binary
+
+# Apple project files
+*.pbxproj text eol=lf
+*.plist text eol=lf
+*.xcconfig text eol=lf
+*.pbxproj merge=union

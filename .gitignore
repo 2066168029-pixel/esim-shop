@@ -1,0 +1,29 @@
+# Workspace-level ignores.
+# Keeps Flutter build output and tool caches out of the repository.
+
+# Dart / Flutter
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/pubspec.lock.bak
+
+# Python
+**/__pycache__/
+**/*.pyc
+
+# Node
+**/node_modules/
+
+# macOS / editors
+**/.DS_Store
+**/Thumbs.db
+
+# Local scratch
+tmp/
+logs/
+shots/
+probe/
+_dump/
+_imgtest/

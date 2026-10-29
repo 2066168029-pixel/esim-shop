@@ -1,0 +1,28 @@
+package com.esimshop.esim_app
+
+import android.os.Bundle
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity : FlutterActivity() {
+
+    private var esimChannel: ESimChannel? = null
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+
+        val channel = ESimChannel(this)
+        esimChannel = channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ESimChannel.CHANNEL)
+            .setMethodCallHandler(channel)
+
+        channel.register()
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        esimChannel?.dispose()
+        esimChannel = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+}

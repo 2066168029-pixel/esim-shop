@@ -1,0 +1,135 @@
+// Linksfield LPAd BLE device protocol (the on-the-wire format).
+//
+// Reconstructed from the decompiled eSIM_Manager 2.5.2 APK, package
+// com.linksfield.lpad.grpc.*. These are the messages that actually travel over
+// the BLE NUS characteristic -- note that com.linksfield.protocol.pb is a
+// *different*, unused-by-BLE copy. Field numbers here are read directly off the
+// generated Java sources and must not be renumbered.
+//
+// Frame: the device expects a raw, length-unprefixed EuiccDeviceReq on the RX
+// characteristic and answers with a raw EuiccDeviceRsp on TX. There is no outer
+// envelope: the cmd field doubles as the discriminator.
+syntax = "proto3";
+
+package linksfield.lpad.grpc;
+
+// ---------------------------------------------------------------------------
+// Request / response envelope
+// ---------------------------------------------------------------------------
+
+message EuiccDeviceReq {
+  enum Command {
+    COMMAND_DEVICE = 0;    // device info, settings
+    COMMAND_EUICC = 1;     // eUICC / LPA applet operations
+    COMMAND_SCARD = 2;     // raw smartcard channel
+    COMMAND_SECURITY = 3;  // handshake + session management
+  }
+  Command cmd = 1;
+  bytes request = 2;
+}
+
+message EuiccDeviceRsp {
+  int32 result = 1;
+  bytes response = 2;
+}
+
+// ---------------------------------------------------------------------------
+// COMMAND_SECURITY
+//
+// When security is disabled in storage (DataType.Config[0] == 0) the client
+// skips encryption entirely and sends EUICC/SCARD payloads in the clear. Only
+// cmd == COMMAND_SECURITY is ever encrypted. This keeps the plaintext path
+// simple -- see k3.a() in the original: `if (!secure && cmd != 3) -> plaintext`.
+// ---------------------------------------------------------------------------
+
+message SecurityProtocol {
+  enum Type {
+    AUTH = 0;
+    UPDATE = 1;
+    CONFIRM = 2;
+  }
+  Type type = 1;
+  SecurityAuth auth = 2;
+  SecurityConfig config = 3;
+  bytes psk = 4;
+  bool enablesec = 5;
+}
+
+message SecurityAuth {
+  bytes nonce = 1;
+  bytes signature = 2;
+}
+
+message SecurityConfig {
+  bytes session_key = 1;
+  bytes init_nonce = 2;
+  bytes aad = 3;
+}
+
+// Wraps an encrypted payload when security is enabled.
+message SecurityData {
+  int32 id = 1;      // session counter, increments per message
+  bytes enc = 2;     // AES-CCM ciphertext + 32-bit tag of the request bytes
+  bytes sec = 3;
+  bytes encsec = 4;
+  int32 error = 5;
+}
+
+// ---------------------------------------------------------------------------
+// COMMAND_SCARD
+// ---------------------------------------------------------------------------
+
+message SmartCardReq {
+  int32 cmd = 1;
+  OpenChannel open_channel = 2;
+  int32 close_channel = 3;
+  TransmitApdu transmit_apdu = 4;
+}
+
+message SmartCardRsp {
+  int32 cmd = 1;
+  int32 result = 2;
+  OpenChannelRsp open_channel = 3;
+  TransmitApduRsp transmit_apdu = 4;
+  bytes function = 5;
+}
+
+message OpenChannel {
+  bytes aid = 1;
+}
+
+message OpenChannelRsp {
+  bytes data = 1;
+}
+
+// ISO 7816-4 APDU. `data` travels as a hex string, not raw bytes -- the Java
+// definition declares it as String.
+message TransmitApdu {
+  int32 channel = 1;
+  int32 cla = 2;
+  int32 instruction = 3;
+  int32 p1 = 4;
+  int32 p2 = 5;
+  int32 p3 = 6;
+  string data = 7;
+}
+
+message TransmitApduRsp {
+  int32 sw1 = 1;
+  int32 sw2 = 2;
+  bytes payload = 3;
+}
+
+// ---------------------------------------------------------------------------
+// COMMAND_DEVICE
+// ---------------------------------------------------------------------------
+
+message DeviceInfo {
+  string vendor = 1;
+  string imei = 2;
+  string sn = 3;
+  string devicename = 4;
+  repeated string capability = 5;
+  bool scardmode = 6;
+  repeated string ability = 7;
+}

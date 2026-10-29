@@ -13,7 +13,16 @@ be used from the x86_64 or arm64 simulator.
   s.platform         = :ios, '15.0'
   s.requires_arc     = true
 
-  # Only the arm64 device slice exists in the vendored xcframework.
+  # Required by CocoaPods even for local path pods: the spec must declare where
+  # its source would live. Nobody downloads it, because the Podfile uses
+  # `:path => 'Frameworks'`, so the xcframework is vendored in-repo. The URL is
+  # only a formality, but it must be present and well-formed or `pod install`
+  # aborts with "missing required attribute `source'".
+  s.source           = { :http => 'https://www.linksfield.net/sdk/eSIMManagerSDK-1.5.3.zip' }
+
+  # The vendored xcframework only ships the arm64 device slice. Excluding the
+  # simulator architectures everywhere keeps SwiftPM/CocoaPods from failing to
+  # resolve symbols when building for a simulator.
   s.pod_target_xcconfig = {
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64 x86_64',
   }
@@ -23,6 +32,6 @@ be used from the x86_64 or arm64 simulator.
 
   s.vendored_frameworks = 'eSIMManagerSDK.xcframework'
 
-  # The SDK links these system frameworks.
+  # System frameworks the binary links against.
   s.frameworks = 'CoreBluetooth', 'SystemConfiguration', 'UIKit', 'AudioToolbox', 'CoreLocation'
 end

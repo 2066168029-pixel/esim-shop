@@ -32,7 +32,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: detect
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 60
     env:
       HAS_SIGNING: ${{ needs.detect.outputs.has_signing }}
@@ -56,9 +56,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.47.6"
+          flutter-version: "3.47.8"
           channel: stable
-          cache: true
+          cache: false
 
       - name: Verify vendored SDK
         working-directory: esim_app

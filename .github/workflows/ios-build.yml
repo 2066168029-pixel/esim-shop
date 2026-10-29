@@ -58,6 +58,23 @@ jobs:
       # failure" / exit 92) on both macos-14 and macos-15, which is a plain
       # network reset on the ~1 GB archive. curl with retry/resume and a
       # sha256 check is far more reliable than a single-shot download.
+      # Pin the Xcode version explicitly. The default Xcode on macos-14/macos-15
+      # images trails the Swift toolchain that generated some plugin code.
+      # shared_preferences_foundation's Pigeon output uses trailing commas in an
+      # @objc initializer parameter list, which older @objc parsers reject with
+      # "unexpected ',' separator". A current Xcode accepts it.
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          echo "Available Xcode versions:"
+          ls -1 /Applications | grep -i '^Xcode' || true
+          # Prefer the newest stable Xcode present on the image.
+          LATEST=$(ls -1d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Selecting: $LATEST"
+          sudo xcode-select -switch "$LATEST/Contents/Developer"
+          xcodebuild -version
+          swift --version
+
       - name: Setup Flutter
         run: |
           set -euo pipefail

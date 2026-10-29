@@ -106,7 +106,7 @@ jobs:
         working-directory: esim_app
         run: |
           flutter --version
-          flutter pub get
+          flutter pub get --enforce-lockfile
 
       - name: Install CocoaPods deps
         working-directory: esim_app/ios

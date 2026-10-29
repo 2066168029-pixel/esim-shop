@@ -32,7 +32,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: detect
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       HAS_SIGNING: ${{ needs.detect.outputs.has_signing }}
@@ -78,29 +78,48 @@ jobs:
           echo "Available Xcode versions:"
           ls -1d /Applications/Xcode*.app || true
 
-          # Sort by the numeric major.minor parsed out of the app name so 26.x
-          # always outranks 16.x, then take the newest.
-          LATEST=$(ls -1d /Applications/Xcode*.app \
-            | sed -E 's#.*/Xcode_?([0-9]+(\.[0-9]+)*).*#\1 &#' \
-            | sort -k1,1V \
-            | awk '{print $2}' \
-            | tail -1)
+          # Parse major.minor.patch out of each app name and sort numerically.
+          # Shell sort variants are unreliable here (the image exposes both
+          # Xcode_15.0.app and Xcode_15.0.1.app, and a plain version sort did
+          # not rank 26.x above 16.x), so let Python do the comparison.
+          LATEST=$(/usr/bin/python3 - <<'PY'
+          import glob, os, re
+          best = None
+          for p in glob.glob('/Applications/Xcode*.app'):
+              m = re.search(r'Xcode_?(\d+(?:\.\d+)*)', os.path.basename(p))
+              if not m:
+                  continue  # skip the unversioned /Applications/Xcode.app alias
+              key = tuple(int(x) for x in m.group(1).split('.'))
+              key = key + (0,) * (4 - len(key))
+              if best is None or key > best[0]:
+                  best = (key, p)
+          print(best[1] if best else '')
+          PY
+          )
+
+          if [ -z "$LATEST" ]; then
+            echo "ERROR: no versioned Xcode.app found under /Applications" >&2
+            ls -la /Applications | head -40 >&2
+            exit 1
+          fi
 
           echo "Selecting: $LATEST"
           sudo xcode-select -switch "$LATEST/Contents/Developer"
           xcodebuild -version
           swift --version
 
-          # Fail fast with a readable message if the toolchain is still too old.
+          # The vendored SDK's swiftinterface uses RawSpan (Swift 6.2+), so a
+          # 6.0 toolchain cannot even parse the module. Fail loudly.
           SWIFT_VER=$(swift --version | head -1 | sed -E 's/.*version ([0-9]+\.[0-9]+).*/\1/')
           echo "Detected Swift $SWIFT_VER"
-          case "$SWIFT_VER" in
-            6.0|5.*)
-              echo "ERROR: Swift $SWIFT_VER cannot load eSIMManagerSDK (needs >= 6.2)." >&2
-              echo "The selected Xcode $LATEST is too old for the vendored SDK." >&2
-              exit 1
-              ;;
-          esac
+          MAJOR=${SWIFT_VER%%.*}
+          MINOR=${SWIFT_VER#*.}
+          if [ "$MAJOR" -lt 6 ] || { [ "$MAJOR" -eq 6 ] && [ "$MINOR" -lt 2 ]; }; then
+            echo "ERROR: Swift $SWIFT_VER cannot load eSIMManagerSDK (needs >= 6.2)." >&2
+            echo "Selected Xcode: $LATEST (too old for the vendored SDK)." >&2
+            echo "This runner image does not provide Xcode 26.x." >&2
+            exit 1
+          fi
 
       - name: Setup Flutter
         run: |

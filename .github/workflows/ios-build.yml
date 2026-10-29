@@ -63,17 +63,44 @@ jobs:
       # shared_preferences_foundation's Pigeon output uses trailing commas in an
       # @objc initializer parameter list, which older @objc parsers reject with
       # "unexpected ',' separator". A current Xcode accepts it.
+      # The vendored eSIMManagerSDK was built with Swift 6.3.3 and its
+      # swiftinterface references RawSpan, a type that did not exist before
+      # Swift 6.2. Any Swift 6.0 compiler rejects the whole module, so the
+      # build must run on Xcode 26.x.
+      #
+      # macos-15 defaults to Xcode 16.4, so pick the highest Xcode 26 on the
+      # image. A plain `sort -V | tail -1` picks the wrong one: version sort
+      # ranks 16.4.x above 26.x in some orderings, which is exactly how the
+      # default toolchain ended up being used.
       - name: Select Xcode
         run: |
           set -euo pipefail
           echo "Available Xcode versions:"
-          ls -1 /Applications | grep -i '^Xcode' || true
-          # Prefer the newest stable Xcode present on the image.
-          LATEST=$(ls -1d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          ls -1d /Applications/Xcode*.app || true
+
+          # Sort by the numeric major.minor parsed out of the app name so 26.x
+          # always outranks 16.x, then take the newest.
+          LATEST=$(ls -1d /Applications/Xcode*.app \
+            | sed -E 's#.*/Xcode_?([0-9]+(\.[0-9]+)*).*#\1 &#' \
+            | sort -k1,1V \
+            | awk '{print $2}' \
+            | tail -1)
+
           echo "Selecting: $LATEST"
           sudo xcode-select -switch "$LATEST/Contents/Developer"
           xcodebuild -version
           swift --version
+
+          # Fail fast with a readable message if the toolchain is still too old.
+          SWIFT_VER=$(swift --version | head -1 | sed -E 's/.*version ([0-9]+\.[0-9]+).*/\1/')
+          echo "Detected Swift $SWIFT_VER"
+          case "$SWIFT_VER" in
+            6.0|5.*)
+              echo "ERROR: Swift $SWIFT_VER cannot load eSIMManagerSDK (needs >= 6.2)." >&2
+              echo "The selected Xcode $LATEST is too old for the vendored SDK." >&2
+              exit 1
+              ;;
+          esac
 
       - name: Setup Flutter
         run: |

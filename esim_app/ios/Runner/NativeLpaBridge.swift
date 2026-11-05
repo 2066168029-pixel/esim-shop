@@ -420,6 +420,19 @@ final class NativeLpaBridge: NSObject {
         }
       }
 
+      // 密码回调尽早注册：SDK 可能在握手阶段就要，而不是等到 getDeviceInfo。
+      // 回调跑在 SDK 自己的线程上并阻塞等待，所以用 DispatchGroup 桥接主线程弹框。
+      LPAdClient.setUserAuthenticationCallback { [weak self] () -> String? in
+        guard let self else { return nil }
+        if !self.cachedPsk.isEmpty {
+          self.log("PSK: replying cached value")
+          return self.cachedPsk
+        }
+        self.log("PSK: SDK requested password, prompting")
+        return self.promptForPasswordBlocking()
+      }
+      self.log("PSK callback registered before reopen()")
+
       self.log("connect(): calling device.reopen()")
       device.reopen()
       self.log("connect(): reopen() returned, waiting for callbacks")
@@ -436,19 +449,6 @@ final class NativeLpaBridge: NSObject {
       self.log("primeClient: no bleDevice")
       done(false)
       return
-    }
-
-    // Demo 的做法：密码回调必须在 getDeviceInfo() 之前注册。
-    // SDK 在它自己的线程上阻塞等待输入，主线程弹框后用 DispatchGroup 桥接回去。
-    LPAdClient.setUserAuthenticationCallback { [weak self] () -> String? in
-      guard let self else { return nil }
-      // 上次用过的密码优先，避免每次都问
-      if !self.cachedPsk.isEmpty {
-        self.log("PSK: replying cached value")
-        return self.cachedPsk
-      }
-      self.log("PSK: prompting on main thread")
-      return self.promptForPasswordBlocking()
     }
 
     self.log("getDeviceInfo attempt \(attempt) -- calling SDK (this blocks)")

@@ -87,24 +87,24 @@ class L {
   String get dataUsed => _t({AppLang.en: 'Used', AppLang.zh: '已使用', AppLang.ja: '使用済み', AppLang.ko: '사용량', AppLang.th: 'ใช้ไป', AppLang.vi: 'Đã dùng'});
   String get payment => _t({AppLang.en: 'Payment Methods', AppLang.zh: '支付方式', AppLang.ja: '支払い方法', AppLang.ko: '결제 수단', AppLang.th: 'วิธีชำระเงิน', AppLang.vi: 'Thanh toán'});
   // refer a friend
-  String get inviteFriends => _t({AppLang.en: 'Invite Friends', AppLang.zh: '邀请好友', AppLang.ja: '友達を招待', AppLang.ko: '?? ??', AppLang.th: 'ชวนเพื่อน', AppLang.vi: 'M?i b?n b?'});
-  String get inviteSubtitle => _t({AppLang.en: 'Friends get 5% off their first order', AppLang.zh: '好友下单立享 5% 优惠', AppLang.ja: '???????? 5% ????', AppLang.ko: '?? ?? ?? 5% ??', AppLang.th: '???????? 5% ???????????', AppLang.vi: 'B?n b? gi?m 5% ??n ??u ti?n'});
-  String get cashVoucher => _t({AppLang.en: 'Cash voucher', AppLang.zh: '现金券', AppLang.ja: '現金クーポン', AppLang.ko: '?? ??', AppLang.th: 'คูปองเงินสด', AppLang.vi: 'Phi?u ti?n m?t'});
-  String get voucherBalance => _t({AppLang.en: 'Balance', AppLang.zh: '余额', AppLang.ja: '残高', AppLang.ko: '잔액', AppLang.th: 'ยอดเงิน', AppLang.vi: 'S? d?'});
-  String get voucherNote => _t({AppLang.en: 'Earn 5% of your friend\'s first order, paid in CNY', AppLang.zh: '好友首单实付金额的 5%，以人民币发放', AppLang.ja: '??? ???? 5%?? CNY????????', AppLang.ko: '?? ?? ?? 5%, CNY ???', AppLang.th: '??? 5% ?????? CNY', AppLang.vi: 'Nh?n 5% ??n h?ng ??u c?a b?n b?, b?ng CNY'});
-  String get useVoucher => _t({AppLang.en: 'Use cash voucher', AppLang.zh: '使用现金券抵扣', AppLang.ja: '使用する', AppLang.ko: '?? ?? ??', AppLang.th: 'ใช้คูปอง', AppLang.vi: 'D?ng phi?u gi?m gi?'});
+  String get inviteFriends => _t({AppLang.en: 'Invite Friends', AppLang.zh: '邀请好友', AppLang.ja: '友達を招待', AppLang.ko: '친구 초대', AppLang.th: 'เชิญเพื่อน', AppLang.vi: 'Mời bạn bè'});
+  String get inviteSubtitle => _t({AppLang.en: 'Friends get 5% off their first order', AppLang.zh: '好友下单立享 5% 优惠', AppLang.ja: '友達の初回注文が5%オフ', AppLang.ko: '친구 첫 주문 5% 할인', AppLang.th: 'เพื่อนรับส่วนลด 5% สำหรับออเดอร์แรก', AppLang.vi: 'Bạn bè giảm 5% cho đơn đầu tiên'});
+  String get cashVoucher => _t({AppLang.en: 'Cash voucher', AppLang.zh: '现金券', AppLang.ja: '現金クーポン', AppLang.ko: '현금 쿠폰', AppLang.th: 'คูปองเงินสด', AppLang.vi: 'Phiếu tiền mặt'});
+  String get voucherBalance => _t({AppLang.en: 'Balance', AppLang.zh: '余额', AppLang.ja: '残高', AppLang.ko: '잔액', AppLang.th: 'ยอดเงิน', AppLang.vi: 'Số dư'});
+  String get voucherNote => _t({AppLang.en: 'Earn 5% of your friend\'s first order, paid in CNY', AppLang.zh: '好友首单实付金额的 5%，以人民币发放', AppLang.ja: '友達の初回注文の5%を人民元で受け取れます', AppLang.ko: '친구 첫 주문 금액의 5%를 위안화로 적립', AppLang.th: 'รับ 5% จากออเดอร์แรกของเพื่อน เป็นเงินหยวน', AppLang.vi: 'Nhận 5% từ đơn đầu tiên của bạn bè, bằng CNY'});
+  String get useVoucher => _t({AppLang.en: 'Use cash voucher', AppLang.zh: '使用现金券抵扣', AppLang.ja: 'クーポンを使う', AppLang.ko: '쿠폰 사용', AppLang.th: 'ใช้คูปอง', AppLang.vi: 'Dùng phiếu'});
 
-  String get inviteCodeOptional => _t({AppLang.en: 'Invite code (optional)', AppLang.zh: '邀请码（选填）', AppLang.ja: '???ID?????', AppLang.ko: '?? ??(??)', AppLang.th: '?????????(?????)', AppLang.vi: 'M? m?i (kh?ng b?t bu?c)'});
-  String get inviteCodeHint => _t({AppLang.en: 'Enter it to get 5% off your first order', AppLang.zh: '塭写可享首单 5% 优惠', AppLang.ja: '??????? 5% ????', AppLang.ko: '?? ?? 5% ??', AppLang.th: '?????? 5% ???????', AppLang.vi: 'Nh?p ?? ???c gi?m 5% ??n ??u'});
-  String get inviteApplied => _t({AppLang.en: 'Invite code applied', AppLang.zh: '邀请码已生效', AppLang.ja: '?????ID????', AppLang.ko: '?? ??? ?????', AppLang.th: 'ใช้รหัสเชิญแล้ว', AppLang.vi: '?? ?p d?ng m? m?i'});
+  String get inviteCodeOptional => _t({AppLang.en: 'Invite code (optional)', AppLang.zh: '邀请码（选填）', AppLang.ja: '招待コード（任意）', AppLang.ko: '초대 코드(선택)', AppLang.th: 'รหัสเชิญ (ไม่บังคับ)', AppLang.vi: 'Mã mời (không bắt buộc)'});
+  String get inviteCodeHint => _t({AppLang.en: 'Enter it to get 5% off your first order', AppLang.zh: '塭写可享首单 5% 优惠', AppLang.ja: '入力すると初回注文が5%オフ', AppLang.ko: '입력하면 첫 주문 5% 할인', AppLang.th: 'กรอกเพื่อรับส่วนลด 5% ออเดอร์แรก', AppLang.vi: 'Nhập để giảm 5% đơn đầu tiên'});
+  String get inviteApplied => _t({AppLang.en: 'Invite code applied', AppLang.zh: '邀请码已生效', AppLang.ja: '招待コードが適用されました', AppLang.ko: '초대 코드가 적용되었습니다', AppLang.th: 'ใช้รหัสเชิญแล้ว', AppLang.vi: 'Đã áp dụng mã mời'});
 
-  String get myInviteCode => _t({AppLang.en: 'My invite code', AppLang.zh: '我的邀请码', AppLang.ja: '?????ID', AppLang.ko: '?? ?? ??', AppLang.th: 'รหัสเชิญของฉัน', AppLang.vi: 'M? m?i c?a t?i'});
-  String get copyInviteCode => _t({AppLang.en: 'Copy code', AppLang.zh: '复制邀请码', AppLang.ja: 'ID ????', AppLang.ko: '?? ??', AppLang.th: 'คัดลอกรหัสเชิญ', AppLang.vi: 'Sao ch?p m?'});
-  String get saved => _t({AppLang.en: 'Saved to album', AppLang.zh: '已保存到相册', AppLang.ja: '保存しました', AppLang.ko: '??? ?????', AppLang.th: 'บันทึกแล้ว', AppLang.vi: '?? l?u v?o th? vi?n'});
-  String get invitedFriends => _t({AppLang.en: 'Invited', AppLang.zh: '已邀请', AppLang.ja: '招待人数', AppLang.ko: '?? ??', AppLang.th: 'จำนวนที่เชิญ', AppLang.vi: '?? m?i'});
-  String get qualifiedFriends => _t({AppLang.en: 'Rewarded', AppLang.zh: '已达标', AppLang.ja: '成立人数', AppLang.ko: '?? ??', AppLang.th: 'ที่สำเร็จ', AppLang.vi: '?? ??t'});
-  String get savePoster => _t({AppLang.en: 'Save poster', AppLang.zh: '保存海报', AppLang.ja: 'ポスターを保存', AppLang.ko: '??? ??', AppLang.th: 'บันทึกโปสเตอร์', AppLang.vi: 'L?u poster'});
-  String get sharePoster => _t({AppLang.en: 'Share poster', AppLang.zh: '分享海报', AppLang.ja: 'ポスターを共有', AppLang.ko: '??? ??', AppLang.th: 'แชร์โปสเตอร์', AppLang.vi: 'Chia s? poster'});
+  String get myInviteCode => _t({AppLang.en: 'My invite code', AppLang.zh: '我的邀请码', AppLang.ja: 'マイ招待コード', AppLang.ko: '내 초대 코드', AppLang.th: 'รหัสเชิญของฉัน', AppLang.vi: 'Mã mời của tôi'});
+  String get copyInviteCode => _t({AppLang.en: 'Copy code', AppLang.zh: '复制邀请码', AppLang.ja: 'コードをコピー', AppLang.ko: '코드 복사', AppLang.th: 'คัดลอกรหัส', AppLang.vi: 'Sao chép mã'});
+  String get saved => _t({AppLang.en: 'Saved to album', AppLang.zh: '已保存到相册', AppLang.ja: 'アルバムに保存しました', AppLang.ko: '앨범에 저장되었습니다', AppLang.th: 'บันทึกไปยังอัลบั้มแล้ว', AppLang.vi: 'Đã lưu vào thư viện ảnh'});
+  String get invitedFriends => _t({AppLang.en: 'Invited', AppLang.zh: '已邀请', AppLang.ja: '招待人数', AppLang.ko: '초대 인원', AppLang.th: 'จำนวนที่เชิญ', AppLang.vi: 'Đã mời'});
+  String get qualifiedFriends => _t({AppLang.en: 'Rewarded', AppLang.zh: '已达标', AppLang.ja: '成立人数', AppLang.ko: '달성 인원', AppLang.th: 'ที่สำเร็จ', AppLang.vi: 'Đã đạt'});
+  String get savePoster => _t({AppLang.en: 'Save poster', AppLang.zh: '保存海报', AppLang.ja: 'ポスターを保存', AppLang.ko: '포스터 저장', AppLang.th: 'บันทึกโปสเตอร์', AppLang.vi: 'L?u poster'});
+  String get sharePoster => _t({AppLang.en: 'Share poster', AppLang.zh: '分享海报', AppLang.ja: 'ポスターを共有', AppLang.ko: '포스터 공유', AppLang.th: 'แชร์โปสเตอร์', AppLang.vi: 'Chia s? poster'});
 
   String get qrCode => _t({AppLang.en: 'QR Code', AppLang.zh: '二维码', AppLang.ja: 'QR コード', AppLang.ko: 'QR 코드', AppLang.th: 'คิวอาร์โค้ด', AppLang.vi: 'Mã QR'});
   String get language => _t({AppLang.en: 'Language', AppLang.zh: '语言', AppLang.ja: '言語', AppLang.ko: '언어', AppLang.th: 'ภาษา', AppLang.vi: 'Ngôn ngữ'});
@@ -635,4 +635,5 @@ class L {
   String get acConfirmPwd => _t({AppLang.en: 'Confirm new password', AppLang.zh: '\u518d\u6b21\u8f93\u5165\u65b0\u5bc6\u7801', AppLang.ja: '\u65b0\u3057\u3044\u30d1\u30b9\u30ef\u30fc\u30c9\uff08\u78ba\u8a8d\uff09', AppLang.ko: '\uc0c8 \ube44\ubc00\ubc88\ud638 \ud655\uc778', AppLang.th: '\u0e22\u0e37\u0e19\u0e22\u0e31\u0e19\u0e23\u0e2b\u0e31\u0e2a\u0e1c\u0e48\u0e32\u0e19\u0e43\u0e2b\u0e21\u0e48', AppLang.vi: 'X\u00e1c nh\u1eadn m\u1eadt kh\u1ea9u m\u1edbi'});
   String get acSave => _t({AppLang.en: 'Save', AppLang.zh: '\u4fdd\u5b58', AppLang.ja: '\u4fdd\u5b58', AppLang.ko: '\uc800\uc7a5', AppLang.th: '\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01', AppLang.vi: 'L\u01b0u'});
   String get scThanksShort => _t({AppLang.en: 'Thank you for your feedback', AppLang.zh: '\u611f\u8c22\u60a8\u7684\u8bc4\u4ef7', AppLang.ja: '\u3054\u8a55\u4fa1\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3059', AppLang.ko: '\ud3c9\uac00 \uac10\uc0ac\ud569\ub2c8\ub2e4', AppLang.th: '\u0e02\u0e2d\u0e1a\u0e04\u0e38\u0e13\u0e2a\u0e33\u0e2b\u0e23\u0e31\u0e1a\u0e04\u0e27\u0e32\u0e21\u0e04\u0e34\u0e14\u0e40\u0e2b\u0e47\u0e19', AppLang.vi: 'C\u1ea3m \u01a1n b\u1ea1n \u0111\u00e3 \u0111\u00e1nh gi\u00e1'});
+  String cwQuotaFull(int used, int cap) => _t({AppLang.en: 'Quota full ($used / $cap). Expand the quota before writing another profile.', AppLang.zh: '\u914d\u989d\u5df2\u6ee1\uff08$used / $cap\uff09\uff0c\u8bf7\u5148\u6269\u5bb9\u518d\u5199\u5361\u3002', AppLang.ja: '\u30af\u30a9\u30fc\u30bf\u304c\u4e0a\u9650\u3067\u3059\uff08$used / $cap\uff09\u3002\u66f8\u304d\u8fbc\u3080\u524d\u306b\u62e1\u5f35\u3057\u3066\u304f\u3060\u3055\u3044\u3002', AppLang.ko: '\ud560\ub2f9\ub7c9\uc774 \uac00\ub4dd \ucc3c\uc2b5\ub2c8\ub2e4 ($used / $cap). \uad6c\uc6b0\uae30 \uc804\uc5d0 \ud655\uc7a5\ud558\uc138\uc694.', AppLang.th: '\u0e42\u0e04\u0e27\u0e15\u0e32\u0e40\u0e15\u0e47\u0e21 ($used / $cap) \u0e01\u0e23\u0e38\u0e13\u0e32\u0e02\u0e22\u0e32\u0e22\u0e01\u0e48\u0e2d\u0e19', AppLang.vi: 'H\u1ebft h\u1ea1n m\u1ee9c ($used / $cap). M\u1edf r\u1ed9ng tr\u01b0\u1edbc khi ghi.'});
 }

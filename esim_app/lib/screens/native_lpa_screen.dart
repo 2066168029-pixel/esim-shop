@@ -197,6 +197,9 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   /// 网络失败不视为"禁止写入"：额度是运营控制项，不该因为断网把功能锁死。
   Future<void> _loadQuota(String eid) async {
     final app = context.read<AppState>();
+    // 新导入的卡 eid 还是空的（要 App 读一次才回填），这时按 ICCID 找。
+    final iccid = _cardIccid;
+
     try {
       if (_profiles.isNotEmpty) {
         await app.api.syncProfiles(
@@ -210,6 +213,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                     'service_provider': x.serviceProviderName,
                   })
               .toList(),
+          iccid: iccid,
         );
       }
     } catch (_) {
@@ -217,17 +221,25 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     }
 
     try {
-      final q = await app.api.bindCard(eid);
+      final q = await app.api.bindCard(eid, iccid: iccid);
       if (!mounted) return;
       setState(() => _quota = q);
     } catch (e) {
       if (!mounted) return;
       setState(() => _quota = null);
-      // 保留原有提示，不覆盖成功消息
       if (_message == null) {
         _setMessage(t.cwQuotaFailed('$e'), isError: true);
       }
     }
+  }
+
+  /// 卡面 ICCID：优先从已装 profile 里取（eUICC 的 profile ICCID 和卡面一致）。
+  /// 拿不到就返回空串，后端会退回按 EID 查。
+  String get _cardIccid {
+    for (final p in _profiles) {
+      if (p.iccid.isNotEmpty) return p.iccid;
+    }
+    return '';
   }
 
   Future<void> _download() async {
@@ -240,6 +252,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       _setMessage(t.cwConnectReaderFirst, isError: true);
       return;
     }
+
+    // 写卡前必须确认配额。服务端是唯一权威：界面上的 _quota 可能已经过期
+    // （别的设备刚写过、后台刚改过配额），所以这里再问一次，而不是信任本地值。
+    if (!await _ensureQuotaAllowsWrite()) return;
 
     setState(() {
       _busy = true;
@@ -284,6 +300,36 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         });
       }
     }
+  }
+
+  /// 写卡前的最后一道闸：向服务端确认这张卡还能不能再写一个 profile。
+  ///
+  /// 宁可多问一次也不要跳过 —— 配额是收费项，写进去的 profile 服务端不认，
+  /// 客户付费后拿到的号码就是废的。
+  Future<bool> _ensureQuotaAllowsWrite() async {
+    final app = context.read<AppState>();
+    final eid = _eid ?? '';
+    final iccid = _cardIccid;
+
+    CardQuota? q;
+    try {
+      q = await app.api.bindCard(eid, iccid: iccid);
+    } catch (e) {
+      // 查不到额度不等于没额度，但也不能放行：没确认就不写。
+      if (mounted) _setMessage(t.cwQuotaFailed('$e'), isError: true);
+      return false;
+    }
+    if (!mounted) return false;
+
+    setState(() => _quota = q);
+
+    if (q.known && q.allowed) return true;
+
+    final msg = !q.known
+        ? q.reasonText
+        : (q.reason.isEmpty ? t.cwQuotaFull(q.boundCount, q.capacity) : q.reasonText);
+    _setMessage(msg, isError: true);
+    return false;
   }
 
   Future<String?> _askConfirmCode() async {

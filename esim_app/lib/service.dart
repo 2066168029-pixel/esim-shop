@@ -375,9 +375,13 @@ class ApiService {
   ///
   /// This is the only place that knows the card's remaining slot count, so a
   /// write must not proceed when [CardQuota.allowed] is false.
-  Future<CardQuota> bindCard(String eid) async =>
+  /// Ask the server whether this card may take another profile.
+  ///
+  /// [iccid] is an optional fallback for a card that has never been read:
+  /// the printed ICCID identifies it until the EID has been filled in.
+  Future<CardQuota> bindCard(String eid, {String iccid = ""}) async =>
       CardQuota.fromJson(await _c.post("/api/sim/bind-card",
-          auth: true, body: {"eid": eid}));
+          auth: true, body: {"eid": eid, "iccid": iccid}));
 
   /// Reconcile the server's record of this card with what is actually on it.
   ///
@@ -387,7 +391,8 @@ class ApiService {
   /// partly full, so the capacity limit is measured against a wrong baseline.
   ///
   /// Idempotent; safe to call on every connect.
-  Future<CardSync> syncProfiles(String eid, List<Map<String, dynamic>> profiles) async =>
+  Future<CardSync> syncProfiles(String eid, List<Map<String, dynamic>> profiles,
+          {String iccid = ""}) async =>
       CardSync.fromJson(await _c.post("/api/sim/sync-profiles",
-          auth: true, body: {"eid": eid, "profiles": profiles}));
+          auth: true, body: {"eid": eid, "iccid": iccid, "profiles": profiles}));
 }

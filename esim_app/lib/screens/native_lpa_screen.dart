@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
+import '../i18n.dart';
 import '../native_lpa.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -43,6 +44,12 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   /// 仅表示"正在写卡"，与 _busy（任意进行中的操作）区分开。
   bool _writing = false;
   bool _moreOpen = false;
+
+  /// 本地多语言访问器。
+  L get t => context.read<AppState>().t;
+
+  /// 当前 _message 是否为失败态（决定卡片配色）。
+  bool _msgIsError = false;
 
   /// 服务端额度（写入配额）。来自 /api/sim/bind-card。
   /// 与安卓 card_writer_screen_v3 的 _quota 保持一致。
@@ -104,7 +111,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         setState(() => _devices.add(d));
       },
       onError: (Object e) {
-        if (mounted) setState(() => _message = '扫描出错：$e');
+        if (mounted) _setMessage(t.cwScanError('$e'), isError: true);
       },
       onDone: () {
         if (mounted) setState(() => _scanning = false);
@@ -116,7 +123,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     setState(() {
       _busy = true;
       _selected = d;
-      _message = '正在连接 ${d.name}…';
+      _setMessage(t.cwStatusConnecting(d.name));
     });
     try {
       // 密码由原生层在 getDeviceInfo() 时弹框询问（与 demo 结构一致），
@@ -124,10 +131,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       final ok = await NativeLpa.connect(d.id);
       if (!mounted) return;
       if (!ok) {
-        setState(() => _message = '连接失败，请检查：\n'
-            '· 读卡器已通电且在手机附近\n'
-            '· 卡密码是否正确（弹框里输入的）\n'
-            '· 仍失败请把控制台 [NativeLpa] 开头的日志发出来');
+        _setMessage(t.cwConnectFailed, isError: true);
         return;
       }
       _stateSub?.cancel();
@@ -137,7 +141,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       });
       await _refresh();
     } catch (e) {
-      if (mounted) setState(() => _message = '连接异常：$e');
+      if (mounted) _setMessage(t.cwConnectError('$e'), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -164,7 +168,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       if (!mounted) return;
       setState(() => _eid = eid);
       if (eid == null || eid.isEmpty) {
-        setState(() => _message = '读取 EID 失败，请重试');
+        _setMessage(t.cwReadEidFailed, isError: true);
         return;
       }
       final r = await NativeLpa.getProfiles();
@@ -178,7 +182,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       // 再查额度。服务端按已绑定数量算配额，不同步的话基数会偏小。
       await _loadQuota(eid);
     } catch (e) {
-      if (mounted) setState(() => _message = '读取卡片信息失败：$e');
+      if (mounted) _setMessage(t.cwReadCardFailed('$e'), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -221,7 +225,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       setState(() => _quota = null);
       // 保留原有提示，不覆盖成功消息
       if (_message == null) {
-        setState(() => _message = '额度查询失败：$e');
+        _setMessage(t.cwQuotaFailed('$e'), isError: true);
       }
     }
   }
@@ -229,11 +233,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   Future<void> _download() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      setState(() => _message = '请先填写激活码');
+      _setMessage(t.cwEnterCodeFirst, isError: true);
       return;
     }
     if (!_connected) {
-      setState(() => _message = '请先在第 1 步连接读卡器');
+      _setMessage(t.cwConnectReaderFirst, isError: true);
       return;
     }
 
@@ -241,7 +245,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       _busy = true;
       _writing = true;
       _progress = null;
-      _message = '正在写卡，请勿断开读卡器…';
+      _setMessage(t.cwWritingDontRemove);
     });
 
     try {
@@ -254,7 +258,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         if (confirm == null) {
           setState(() {
             _busy = false;
-            _message = '已取消';
+            _setMessage(t.cwCancelled);
           });
           return;
         }
@@ -263,7 +267,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       }
 
       setState(() {
-        _message = r.ok ? '写卡成功' : '写卡失败（错误码 ${r.result}）';
+        _message = r.ok ? t.cwWriteSuccess : t.cwWriteFailedCode(r.result);
       });
       if (r.ok) {
         _codeController.clear();
@@ -271,7 +275,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         await _refresh();
       }
     } catch (e) {
-      if (mounted) setState(() => _message = '写卡异常：$e');
+      if (mounted) _setMessage(t.cwWriteError('$e'), isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -287,21 +291,21 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     final v = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('确认码'),
+        title: Text(t.cwConfirmCodeTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '运营商要求输入确认码才能继续。',
+            Text(
+              t.cwConfirmCodeNeeded,
               style: TextStyle(fontSize: 12, color: AppColors.muted),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: c,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: '确认码',
+              decoration: InputDecoration(
+                labelText: t.cwConfirmCodeTitle,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -310,11 +314,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(t.cwCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, c.text.trim()),
-            child: const Text('确定'),
+            child: Text(t.cwOk),
           ),
         ],
       ),
@@ -331,10 +335,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     try {
       final r = await op();
       if (!mounted) return;
-      setState(() => _message = r.ok ? '$label成功' : '$label失败（错误码 ${r.result}）');
+      setState(() => _message = r.ok ? t.cwWriteSuccess : t.cwWriteFailedCode(r.result));
       if (r.ok) await _refresh();
     } catch (e) {
-      if (mounted) setState(() => _message = '$label异常：$e');
+      if (mounted) setState(() => _message = t.cwWriteError('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -343,10 +347,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   void _onProfileAction(String action, NativeLpaProfile p) {
     switch (action) {
       case 'enable':
-        _runOp('启用', () => NativeLpa.enable(p.iccid));
+        _runOp(t.cwEnable, () => NativeLpa.enable(p.iccid));
         break;
       case 'disable':
-        _runOp('停用', () => NativeLpa.disable(p.iccid));
+        _runOp(t.cwDisable, () => NativeLpa.disable(p.iccid));
         break;
       case 'delete':
         _confirmDelete(p);
@@ -361,23 +365,24 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除 profile'),
-        content: Text('确定删除 ${p.serviceProviderName} (${p.iccid})？\n删除后需重新写卡。'),
+        title: Text(t.cwDeleteProfile),
+        content: Text(t.cwDeleteProfileConfirm(
+            p.serviceProviderName, p.iccid)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(t.cwCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除'),
+            child: Text(t.cwDelete),
           ),
         ],
       ),
     );
     if (ok == true) {
-      await _runOp('删除', () => NativeLpa.delete(p.iccid));
+      await _runOp(t.cwDelete, () => NativeLpa.delete(p.iccid));
     }
   }
 
@@ -386,30 +391,30 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('重命名'),
+        title: Text(t.cwRename),
         content: TextField(
           controller: c,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '名称',
+          decoration: InputDecoration(
+            labelText: t.cwName,
             border: OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(t.cwCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, c.text.trim()),
-            child: const Text('确定'),
+            child: Text(t.cwOk),
           ),
         ],
       ),
     );
     c.dispose();
     if (name != null && name.isNotEmpty) {
-      await _runOp('重命名', () => NativeLpa.setNickname(p.iccid, name));
+      await _runOp(t.cwRename, () => NativeLpa.setNickname(p.iccid, name));
     }
   }
 
@@ -422,7 +427,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('写入 eSIM'),
+        title: Text(t.cwTitle),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.text,
         elevation: 0.5,
@@ -442,13 +447,13 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           children: [
             const Icon(Icons.bluetooth_disabled, size: 56, color: AppColors.muted),
             const SizedBox(height: 16),
-            const Text(
-              '当前环境不支持原生写卡',
+            Text(
+              t.cwUnsupported,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
-            const Text(
-              '原生 SDK 只提供真机 arm64 切片，模拟器上不可用。\n请使用 Dart 传输流程，或换真机运行。',
+            Text(
+              t.cwUnsupportedDetail,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppColors.muted, height: 1.6),
             ),
@@ -464,22 +469,24 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       children: [
         _step(
           index: 1,
-          title: '选择读卡器',
-          hint: '给卡通电后扫描，点一下即可连接',
+          title: t.cwStepReader,
+          hint: t.cwStepReaderHint,
           child: _step1Scanner(),
         ),
         const SizedBox(height: 14),
         _step(
           index: 2,
-          title: '激活码',
-          hint: '粘贴或扫码；二维码印在供应商给的卡上',
+          title: t.cwStepCode,
+          hint: t.cwStepCodeHint,
           child: _step2Code(),
         ),
         const SizedBox(height: 14),
         _step(
           index: 3,
-          title: '写卡',
-          hint: _connected ? '已连接 ${_selected?.name ?? ''}' : '先在第 1 步连上读卡器',
+          title: t.cwStepWrite,
+          hint: _connected
+              ? t.cwStepWriteHintReady(_selected?.name ?? '')
+              : t.cwStepWriteHintIdle,
           child: _step3Write(),
         ),
         if (_message != null) ...[
@@ -496,7 +503,9 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
 
   Widget _step1Scanner() {
     final label = _selected?.name ??
-        (_devices.isEmpty ? '尚未发现设备' : '发现 ${_devices.length} 个设备');
+        (_devices.isEmpty
+            ? t.cwNoDeviceYet
+            : t.cwFoundDevices(_devices.length));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -516,7 +525,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
             if (_connected)
               TextButton(
                 onPressed: _busy ? null : _disconnect,
-                child: const Text('断开'),
+                child: Text(t.cwDisconnect),
               ),
           ],
         ),
@@ -524,7 +533,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         FilledButton.icon(
           onPressed: _busy ? null : _toggleScan,
           icon: Icon(_scanning ? Icons.stop : Icons.bluetooth_searching),
-          label: Text(_scanning ? '停止扫描' : '扫描蓝牙读卡器'),
+          label: Text(_scanning ? t.cwStopScan : t.cwScanReader),
         ),
         if (_devices.isNotEmpty && !_connected) ...[
           const SizedBox(height: 8),
@@ -578,8 +587,8 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           maxLines: 3,
           minLines: 2,
           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            labelText: 'LPA: 激活码',
+          decoration: InputDecoration(
+            labelText: t.cwActivationPlaceholder,
             hintText: r'LPA:1$SMDP.EXAMPLE.COM$MATCHING-ID',
             hintStyle: TextStyle(fontSize: 12),
             border: OutlineInputBorder(),
@@ -594,7 +603,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : _scanQr,
                 icon: const Icon(Icons.qr_code_scanner, size: 18),
-                label: const Text('扫码'),
+                label: Text(t.cwScan),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -608,7 +617,9 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 child: Text(
-                  _confirmController.text.isEmpty ? '确认码（可选）' : '确认码已填',
+                  _confirmController.text.isEmpty
+                      ? t.cwConfirmCodeOptional
+                      : t.cwConfirmCodeFilled,
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -636,21 +647,21 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     final v = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('确认码'),
+        title: Text(t.cwConfirmCodeTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '部分运营商需要额外确认码，没有就留空。',
+            Text(
+              t.cwConfirmCodeNeeded,
               style: TextStyle(fontSize: 12, color: AppColors.muted),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: c,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: '确认码',
+              decoration: InputDecoration(
+                labelText: t.cwConfirmCodeTitle,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -659,11 +670,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(t.cwCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, c.text.trim()),
-            child: const Text('确定'),
+            child: Text(t.cwOk),
           ),
         ],
       ),
@@ -694,7 +705,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                   ),
                 )
               : const Icon(Icons.download),
-          label: Text(writing ? '写卡中…' : '开始写卡'),
+          label: Text(writing ? t.cwWriting : t.cwStartWrite),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: AppColors.border,
@@ -711,8 +722,17 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
 
   // ----- 消息条 -----
 
+  /// 设置提示消息并标记成败，供 _messageCard 配色。
+  void _setMessage(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    setState(() {
+      _message = msg;
+      _msgIsError = isError;
+    });
+  }
+
   Widget _messageCard() {
-    final isErr = _message!.contains('失败') || _message!.contains('异常');
+    final isErr = _msgIsError;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -750,14 +770,16 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  const Text(
-                    '更多功能',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  Text(
+                    t.cwMoreFunctions,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _connected ? '已装 ${_profiles.length} 个 profile' : '需先连接读卡器',
+                      _connected
+                          ? t.cwProfilesInstalled(_profiles.length)
+                          : t.cwConnectReaderFirst,
                       style: const TextStyle(fontSize: 12, color: AppColors.muted),
                     ),
                   ),
@@ -772,10 +794,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           if (_moreOpen) ...[
             const Divider(height: 1),
             if (!_connected)
-              const Padding(
-                padding: EdgeInsets.all(16),
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Text(
-                  '连接读卡器后可查看 EID、管理已装 profile',
+                  t.cwConnectToSee,
                   style: TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
               )
@@ -785,7 +807,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _kv('设备', _selected?.name ?? '-'),
+                    _kv(t.cwDevice, _selected?.name ?? '-'),
                     _kv('EID', _eid ?? '-'),
                     if (_quota != null) _quotaRow(),
                   ],
@@ -798,24 +820,24 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _busy ? null : _refresh,
-                        child: const Text('刷新 profile'),
+                        child: Text(t.cwRefreshProfiles),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _busy ? null : _disconnect,
-                        child: const Text('断开'),
+                        child: Text(t.cwDisconnect),
                       ),
                     ),
                   ],
                 ),
               ),
               if (_profiles.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    '这张卡上还没有 profile',
+                    t.cwNoProfiles,
                     style: TextStyle(fontSize: 12, color: AppColors.muted),
                   ),
                 )
@@ -842,10 +864,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 66,
             child: Text(
-              '写入额度',
+              t.cwQuotaTitle,
               style: TextStyle(fontSize: 12, color: AppColors.muted),
             ),
           ),
@@ -862,10 +884,10 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           if (q.known)
             InkWell(
               onTap: _buyQuota,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
-                  '扩容',
+                  t.cwQuotaExpand,
                   style: TextStyle(fontSize: 12, color: AppColors.primary),
                 ),
               ),
@@ -884,25 +906,24 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('扩容'),
+        title: Text(t.cwQuotaExpandTitle),
         content: Text(
           q == null || !q.known
-              ? '当前额度状态未知，请刷新后重试。'
-              : '当前已用 ${q.boundCount} / ${q.capacity}。\n'
-                  '去套餐页购买额度包，支付后返回本页点「刷新 profile」即可生效。',
+              ? t.cwQuotaUnknown
+              : t.cwQuotaExpandBody(q.boundCount, q.capacity),
           style: const TextStyle(fontSize: 13, height: 1.6),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(t.cwCancel),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.maybePop(context);
             },
-            child: const Text('去套餐页'),
+            child: Text(t.cwGoToPlans),
           ),
         ],
       ),
@@ -952,8 +973,8 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
-                          '使用中',
+                        child: Text(
+                          t.cwInUse,
                           style: TextStyle(fontSize: 9, color: Colors.white),
                         ),
                       ),
@@ -974,11 +995,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
             onSelected: (v) => _onProfileAction(v, p),
             itemBuilder: (_) => [
               if (!active)
-                const PopupMenuItem(value: 'enable', child: Text('启用')),
+                PopupMenuItem(value: 'enable', child: Text(t.cwEnable)),
               if (active)
-                const PopupMenuItem(value: 'disable', child: Text('停用')),
-              const PopupMenuItem(value: 'rename', child: Text('重命名')),
-              const PopupMenuItem(value: 'delete', child: Text('删除')),
+                PopupMenuItem(value: 'disable', child: Text(t.cwDisable)),
+              PopupMenuItem(value: 'rename', child: Text(t.cwRename)),
+              PopupMenuItem(value: 'delete', child: Text(t.cwDelete)),
             ],
           ),
         ],

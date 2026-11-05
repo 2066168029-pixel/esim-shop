@@ -426,7 +426,12 @@ final class NativeLpaBridge: NSObject {
         let validStr = valid ? "true" : "false"
         self.log("isValidDevice -> \(validStr)")
         if valid {
-          self.sdkQueue.async { self.primeClient(done: done) }
+          // demo：isValidDevice -> 直接调 getDeviceInfo()，其内部用全局队列。
+          // 这里同理走全局队列，避免 sdkQueue 正被其它 SDK 调用占用时卡住。
+          self.log("isValidDevice: dispatching getDeviceInfo on global queue")
+          DispatchQueue.global(qos: .userInitiated).async {
+            self.primeClient(done: done)
+          }
         } else {
           // The SDK will also report CONNECTFAIL; keep the timeout as backstop.
           self.log("device reported invalid")
@@ -446,9 +451,21 @@ final class NativeLpaBridge: NSObject {
       }
       self.log("PSK callback registered before reopen()")
 
-      self.log("connect(): calling device.reopen()")
-      device.reopen()
-      self.log("connect(): reopen() returned, waiting for callbacks")
+      // 文档 4.4.2 / demo：reopen() 在全局队列里异步发起，
+      // 不占用任何会阻塞的串行队列。
+      self.log("connect(): calling device.reopen() (on global queue)")
+      self.log("connect(): before reopen, delegate=\(Self.describeDelegate(central.delegate, self) )")
+      DispatchQueue.global(qos: .userInitiated).async {
+        device.reopen()
+        // reopen() 之后看 SDK 有没有把 delegate 抢走。
+        // demo 的详情页从不设置 delegate，SDK 也照样能工作 —— 说明它
+        // 可能不需要抢，或者用的是自己的 CBManager。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+          guard let self, let c = self.central else { return }
+          self.log("post-reopen: delegate=\(Self.describeDelegate(c.delegate, self))")
+        }
+      }
+      self.log("connect(): reopen dispatched, waiting for callbacks")
     }
   }
 
@@ -592,6 +609,13 @@ final class NativeLpaBridge: NSObject {
   }
 
   /// 把 central 的 delegate 从 SDK 手里拿回来给扫描用。
+  /// 把 delegate 身份转成可读字符串，方便日志判断 SDK 有没有接管。
+  private static func describeDelegate(_ d: Any?, _ me: AnyObject) -> String {
+    guard let d else { return "nil" }
+    if (d as AnyObject) === me { return "self" }
+    return String(describing: type(of: d))
+  }
+
   private func reclaimCentralDelegate() {
     guard let c = central else { return }
     if c.delegate !== self {

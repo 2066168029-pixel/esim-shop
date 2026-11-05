@@ -39,6 +39,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   double? _progress;
   bool _moreOpen = false;
 
+  /// 原生层诊断日志，滚动展示在页面底部。
+  final List<String> _logs = [];
+  StreamSubscription<String>? _logSub;
+  bool _moreOpenLog = false;
+
   final _codeController = TextEditingController();
   final _confirmController = TextEditingController();
 
@@ -49,6 +54,13 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   void initState() {
     super.initState();
     _checkAvailability();
+    _logSub = NativeLpa.logs.listen((line) {
+      if (!mounted) return;
+      setState(() {
+        _logs.add(line);
+        if (_logs.length > 200) _logs.removeAt(0);
+      });
+    });
   }
 
   @override
@@ -56,6 +68,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     _scanSub?.cancel();
     _stateSub?.cancel();
     _notifySub?.cancel();
+    _logSub?.cancel();
     NativeLpa.stopScan().catchError((Object _) {});
     _codeController.dispose();
     _confirmController.dispose();
@@ -430,6 +443,8 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           _messageCard(),
         ],
         const SizedBox(height: 18),
+        _logSection(),
+        const SizedBox(height: 12),
         _moreSection(),
       ],
     );
@@ -674,6 +689,70 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   }
 
   // ----- 更多功能 -----
+
+  /// 诊断日志面板：连接失败时用户可以直接截图给我。
+  Widget _logSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _moreOpenLog = !_moreOpenLog),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.terminal, size: 18, color: AppColors.muted),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '连接日志',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _logs.isEmpty ? '暂无' : '${_logs.length} 条 · 点开查看',
+                      style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
+                  ),
+                  Icon(
+                    _moreOpenLog ? Icons.expand_less : Icons.expand_more,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_moreOpenLog) ...[
+            const Divider(height: 1),
+            Container(
+              height: 240,
+              width: double.infinity,
+              color: const Color(0xFF1E1E1E),
+              padding: const EdgeInsets.all(10),
+              child: SingleChildScrollView(
+                reverse: true,
+                child: SelectableText(
+                  _logs.isEmpty ? '（还没有日志）' : _logs.join('\n'),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    height: 1.45,
+                    fontFamily: 'Menlo',
+                    color: Color(0xFFB0F0B0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _moreSection() {
     return Container(

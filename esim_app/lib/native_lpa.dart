@@ -191,6 +191,13 @@ class NativeLpa {
     return r?['connected'] as bool? ?? false;
   }
 
+  /// 原生层的诊断日志（EventChannel 里 type == 'log'）。
+  ///
+  /// App 内直接可见，不需要连 Mac 看 Xcode 控制台。
+  static Stream<String> get logs => rawEvents
+      .where((e) => e['type'] == 'log')
+      .map((e) => (e['message'] as String?) ?? '');
+
   /// 切换加密/明文建链模式。默认加密（覆盖面更广）。
   static Future<void> setSecureMode(bool secure) async {
     await _method.invokeMethod<void>('setSecureMode', {'secure': secure});

@@ -77,7 +77,9 @@ final class NativeLpaBridge: NSObject {
   private var client: LPAdClient { LPAdClient.shared }
   /// 加密卡走 SecurityBleDevice。默认 true（覆盖面更广）；
   /// Dart 侧可通过 setSecureMode 切换，方便对比排查。
-  private var preferSecure = true
+  private var preferSecure = false
+  /// 正在等用户输入卡密码：看门狗暂停计时，否则用户输得慢会被误判超时。
+  private var pskPrompting = false
 
   /// 卡密码（PSK）。SDK 在阻塞线程上问密码，弹不了框，只能回填已存的。
   private var cachedPsk: String {
@@ -237,14 +239,14 @@ final class NativeLpaBridge: NSObject {
       // args: {secure: bool}  默认 true
       let secure = args["secure"] as? Bool ?? true
       preferSecure = secure
-      NSLog("[NativeLpa] secure mode = %@", secure ? "on" : "off")
+      log("secure mode = \(secure ? "on" : "off")")
       result(nil)
 
     case "setCardPassword":
       // args: {password: String}  空串表示清除
       let pwd = args["password"] as? String ?? ""
       cachedPsk = pwd
-      NSLog("[NativeLpa] card password %@", pwd.isEmpty ? "cleared" : "set")
+      log("card password \(pwd.isEmpty ? "cleared" : "set")")
       result(nil)
 
     case "hasCardPassword":
@@ -324,9 +326,6 @@ final class NativeLpaBridge: NSObject {
         rxUUID: Self.euiccRx,
         txUUID: Self.euiccTx)
 
-      // 加密卡必须用 SecurityBleDevice 建链，否则后续 APDU 全部走不通。
-      // 用 secureMode 开关切换：默认先走加密版（覆盖面更广），
-      // 密码在需要时由 SDK 回调上来问用户。
       let identity = peripheral.identifier.uuidString
       let device: EuiccBleDevice
       if self.preferSecure {
@@ -340,10 +339,10 @@ final class NativeLpaBridge: NSObject {
           rxUUID: Self.euiccRx,
           txUUID: Self.euiccTx)
         device = secure
-        NSLog("[NativeLpa] using SecurityBleDevice (identity=%@)", identity)
+        log("mode: SecurityBleDevice (secure)")
       } else {
         device = probe
-        NSLog("[NativeLpa] using plain EuiccBleDevice")
+        log("mode: plain EuiccBleDevice")
       }
 
       self.bleDevice = device
@@ -356,15 +355,45 @@ final class NativeLpaBridge: NSObject {
         self.reply(result, ["connected": ok])
       }
 
+      // 看门狗：只在"长时间无任何进度"时才判失败。
+      // 任何回调（连接状态、设备有效性）都会刷新 lastProgress，
+      // 弹密码框期间暂停计时，避免用户输入慢导致误判。
+      let start = DispatchTime.now()
+      var lastProgress = start
+      self.pskPrompting = false
+      let waiting = DispatchSemaphore(value: 0)
+
+      let progress: () -> Void = {
+        lastProgress = DispatchTime.now()
+      }
+
+      DispatchQueue.global().async {
+        while true {
+          Thread.sleep(forTimeInterval: 0.5)
+          if replied { return }
+          // 正在等用户输密码：暂停判断
+          if self.pskPrompting { lastProgress = DispatchTime.now(); continue }
+          let elapsed = DispatchTime.now().uptimeNanoseconds &- lastProgress.uptimeNanoseconds
+          if elapsed > 20_000_000_000 {   // 20s 无进度
+            log("watchdog: no progress for 20s -> fail")
+            done(false)
+            return
+          }
+        }
+      }
+      _ = start
+      _ = waiting
+
       device.connectStateCallback = { [weak self] state in
         guard let self else { return }
+        progress()
         self.emit(["type": "connect", "state": state.rawValue])
-        NSLog("[NativeLpa] connect state -> %d", state.rawValue)
+        log("connect state -> \(state.rawValue)")
         if state == .STATE_CONNECTFAIL {
-          NSLog("[NativeLpa] connect FAILED (stack reported failure)")
+          log("connect FAILED (stack reported failure)")
           done(false)
         } else if state == .STATE_DISCONNECTED {
-          NSLog("[NativeLpa] disconnected before ready")
+          log("disconnected before ready")
           done(false)
         }
         // STATE_CONNECTED only means the GATT link is up. Service discovery,
@@ -375,27 +404,20 @@ final class NativeLpaBridge: NSObject {
 
       device.isValidDeviceCallback = { [weak self] valid in
         guard let self else { return }
+        progress()
         self.emit(["type": "valid", "valid": valid])
-        NSLog("[NativeLpa] isValidDevice -> %@", valid ? "true" : "false")
+        log("isValidDevice -> \(valid ? "true" : "false")")
         if valid {
           self.sdkQueue.async { self.primeClient(done: done) }
         } else {
           // The SDK will also report CONNECTFAIL; keep the timeout as backstop.
-          NSLog("[NativeLpa] device reported invalid")
+          log("device reported invalid")
         }
       }
 
       device.reopen()
 
-      NSLog("[NativeLpa] reopen() called, waiting for state callback...")
-
-      // Safety net. MUST NOT run on sdkQueue: if the SDK is blocked inside one
-      // of its own blocking calls, a timer queued on the same serial queue can
-      // never fire and the Dart future hangs forever. Use a global queue.
-      DispatchQueue.global().asyncAfter(deadline: .now() + 20) {
-        NSLog("[NativeLpa] connect timed out after 20s (callbacks never fired)")
-        done(false)
-      }
+      log("reopen() called, waiting for state callback...")
     }
   }
 
@@ -406,7 +428,7 @@ final class NativeLpaBridge: NSObject {
   /// with a short backoff before giving up.
   private func primeClient(done: @escaping (Bool) -> Void, attempt: Int = 1) {
     guard let device = bleDevice else {
-      NSLog("[NativeLpa] primeClient: no bleDevice")
+      log("primeClient: no bleDevice")
       done(false)
       return
     }
@@ -417,18 +439,18 @@ final class NativeLpaBridge: NSObject {
       guard let self else { return nil }
       // 上次用过的密码优先，避免每次都问
       if !self.cachedPsk.isEmpty {
-        NSLog("[NativeLpa] PSK: replying cached value")
+        log("PSK: replying cached value")
         return self.cachedPsk
       }
-      NSLog("[NativeLpa] PSK: prompting on main thread")
+      log("PSK: prompting on main thread")
       return self.promptForPasswordBlocking()
     }
 
-    NSLog("[NativeLpa] getDeviceInfo attempt %d", attempt)
+    log("getDeviceInfo attempt \(attempt)")
     let info = device.getDeviceInfo()
 
     guard let info else {
-      NSLog("[NativeLpa] getDeviceInfo returned nil (attempt %d)", attempt)
+      log("getDeviceInfo returned nil (attempt \(attempt))")
       if attempt < 3 {
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
           self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
@@ -440,12 +462,11 @@ final class NativeLpaBridge: NSObject {
       return
     }
 
-    NSLog("[NativeLpa] deviceInfo imei='%@' vendor='%@' sn='%@'",
-          info.imei, info.vendor, info.sn)
+    log("deviceInfo imei='\(info.imei)' vendor='\(info.vendor)' sn='\(info.sn)'")
 
     let imei = info.imei
     guard !imei.isEmpty else {
-      NSLog("[NativeLpa] empty imei on attempt %d", attempt)
+      log("empty imei on attempt \(attempt)")
       if attempt < 3 {
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
           self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
@@ -481,6 +502,8 @@ final class NativeLpaBridge: NSObject {
   /// 这里用 DispatchGroup 把结果桥接回来。60 秒不输入就放弃，避免
   /// sdkQueue 被永久占住（后续所有 SDK 调用都会排队）。
   private func promptForPasswordBlocking() -> String? {
+    pskPrompting = true
+    defer { pskPrompting = false }
     let group = DispatchGroup()
     group.enter()
     var result: String?
@@ -497,12 +520,12 @@ final class NativeLpaBridge: NSObject {
         tf.autocapitalizationType = .none
       }
       alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
-        NSLog("[NativeLpa] PSK: user cancelled")
+        log("PSK: user cancelled")
         group.leave()
       })
       alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
         let v = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        NSLog("[NativeLpa] PSK: user entered %d chars", v.count)
+        log("PSK: user entered \(v.count) chars")
         result = v.isEmpty ? nil : v
         group.leave()
       })
@@ -523,7 +546,7 @@ final class NativeLpaBridge: NSObject {
     // 60 秒兜底：用户一直不理会就放弃，别把 SDK 队列卡死
     let timeout = DispatchTime.now() + 60
     if group.wait(timeout: timeout) == .timedOut {
-      NSLog("[NativeLpa] PSK: prompt timed out after 60s")
+      log("PSK: prompt timed out after 60s")
       return nil
     }
     // 记住这次输入，下次直接复用
@@ -564,6 +587,13 @@ final class NativeLpaBridge: NSObject {
 
   private func reply(_ result: @escaping FlutterResult, _ value: Any?) {
     resultQueue.async { result(value) }
+  }
+
+  /// 统一日志：既打 NSLog（Xcode 可见），也通过 EventChannel 发给 Dart，
+  /// 这样 App 内能直接看到进度，不需要连 Mac。
+  private func log(_ msg: String) {
+    log("%@", msg)
+    emit(["type": "log", "message": msg])
   }
 
   private func emit(_ event: [String: Any]) {

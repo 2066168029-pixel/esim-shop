@@ -240,7 +240,7 @@ final class NativeLpaBridge: NSObject {
       let secure = args["secure"] as? Bool ?? true
       preferSecure = secure
       let modeStr = secure ? "on" : "off"
-      log("secure mode = \(modeStr)")
+      self.log("secure mode = \(modeStr)")
       result(nil)
 
     case "setCardPassword":
@@ -248,7 +248,7 @@ final class NativeLpaBridge: NSObject {
       let pwd = args["password"] as? String ?? ""
       cachedPsk = pwd
       let pwdState = pwd.isEmpty ? "cleared" : "set"
-      log("card password \(pwdState)")
+      self.log("card password \(pwdState)")
       result(nil)
 
     case "hasCardPassword":
@@ -341,10 +341,10 @@ final class NativeLpaBridge: NSObject {
           rxUUID: Self.euiccRx,
           txUUID: Self.euiccTx)
         device = secure
-        log("mode: SecurityBleDevice (secure)")
+        self.log("mode: SecurityBleDevice (secure)")
       } else {
         device = probe
-        log("mode: plain EuiccBleDevice")
+        self.log("mode: plain EuiccBleDevice")
       }
 
       self.bleDevice = device
@@ -377,7 +377,7 @@ final class NativeLpaBridge: NSObject {
           if self.pskPrompting { lastProgress = DispatchTime.now(); continue }
           let elapsed = DispatchTime.now().uptimeNanoseconds &- lastProgress.uptimeNanoseconds
           if elapsed > 20_000_000_000 {   // 20s 无进度
-            log("watchdog: no progress for 20s -> fail")
+            self.log("watchdog: no progress for 20s -> fail")
             done(false)
             return
           }
@@ -390,12 +390,12 @@ final class NativeLpaBridge: NSObject {
         guard let self else { return }
         progress()
         self.emit(["type": "connect", "state": state.rawValue])
-        log("connect state -> \(state.rawValue)")
+        self.log("connect state -> \(state.rawValue)")
         if state == .STATE_CONNECTFAIL {
-          log("connect FAILED (stack reported failure)")
+          self.log("connect FAILED (stack reported failure)")
           done(false)
         } else if state == .STATE_DISCONNECTED {
-          log("disconnected before ready")
+          self.log("disconnected before ready")
           done(false)
         }
         // STATE_CONNECTED only means the GATT link is up. Service discovery,
@@ -409,18 +409,18 @@ final class NativeLpaBridge: NSObject {
         progress()
         self.emit(["type": "valid", "valid": valid])
         let validStr = valid ? "true" : "false"
-        log("isValidDevice -> \(validStr)")
+        self.log("isValidDevice -> \(validStr)")
         if valid {
           self.sdkQueue.async { self.primeClient(done: done) }
         } else {
           // The SDK will also report CONNECTFAIL; keep the timeout as backstop.
-          log("device reported invalid")
+          self.log("device reported invalid")
         }
       }
 
       device.reopen()
 
-      log("reopen() called, waiting for state callback...")
+      self.log("reopen() called, waiting for state callback...")
     }
   }
 
@@ -431,7 +431,7 @@ final class NativeLpaBridge: NSObject {
   /// with a short backoff before giving up.
   private func primeClient(done: @escaping (Bool) -> Void, attempt: Int = 1) {
     guard let device = bleDevice else {
-      log("primeClient: no bleDevice")
+      self.log("primeClient: no bleDevice")
       done(false)
       return
     }
@@ -442,18 +442,18 @@ final class NativeLpaBridge: NSObject {
       guard let self else { return nil }
       // 上次用过的密码优先，避免每次都问
       if !self.cachedPsk.isEmpty {
-        log("PSK: replying cached value")
+        self.log("PSK: replying cached value")
         return self.cachedPsk
       }
-      log("PSK: prompting on main thread")
+      self.log("PSK: prompting on main thread")
       return self.promptForPasswordBlocking()
     }
 
-    log("getDeviceInfo attempt \(attempt)")
+    self.log("getDeviceInfo attempt \(attempt)")
     let info = device.getDeviceInfo()
 
     guard let info else {
-      log("getDeviceInfo returned nil (attempt \(attempt))")
+      self.log("getDeviceInfo returned nil (attempt \(attempt))")
       if attempt < 3 {
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
           self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
@@ -465,11 +465,11 @@ final class NativeLpaBridge: NSObject {
       return
     }
 
-    log("deviceInfo imei='\(info.imei)' vendor='\(info.vendor)' sn='\(info.sn)'")
+    self.log("deviceInfo imei='\(info.imei)' vendor='\(info.vendor)' sn='\(info.sn)'")
 
     let imei = info.imei
     guard !imei.isEmpty else {
-      log("empty imei on attempt \(attempt)")
+      self.log("empty imei on attempt \(attempt)")
       if attempt < 3 {
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
           self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
@@ -523,12 +523,12 @@ final class NativeLpaBridge: NSObject {
         tf.autocapitalizationType = .none
       }
       alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
-        log("PSK: user cancelled")
+        self.log("PSK: user cancelled")
         group.leave()
       })
       alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
         let v = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        log("PSK: user entered \(v.count) chars")
+        self.log("PSK: user entered \(v.count) chars")
         result = v.isEmpty ? nil : v
         group.leave()
       })
@@ -549,7 +549,7 @@ final class NativeLpaBridge: NSObject {
     // 60 秒兜底：用户一直不理会就放弃，别把 SDK 队列卡死
     let timeout = DispatchTime.now() + 60
     if group.wait(timeout: timeout) == .timedOut {
-      log("PSK: prompt timed out after 60s")
+      self.log("PSK: prompt timed out after 60s")
       return nil
     }
     // 记住这次输入，下次直接复用

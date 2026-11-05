@@ -110,10 +110,33 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       _message = '正在连接 ${d.name}…';
     });
     try {
-      final ok = await NativeLpa.connect(d.id);
+      var ok = await NativeLpa.connect(d.id);
       if (!mounted) return;
+
+      // 加密卡会要 PSK。首次没存过就一定连不上，此时问一次密码再重连。
       if (!ok) {
-        setState(() => _message = '连接失败，请确认读卡器已通电并靠近手机');
+        final hasPsk = await NativeLpa.hasCardPassword;
+        if (!mounted) return;
+        if (!hasPsk) {
+          final pwd = await _askCardPassword();
+          if (!mounted) return;
+          if (pwd == null) {
+            setState(() => _message = '已取消连接');
+            return;
+          }
+          await NativeLpa.setCardPassword(pwd);
+          if (!mounted) return;
+          setState(() => _message = '正在用密码重连…');
+          ok = await NativeLpa.connect(d.id);
+          if (!mounted) return;
+        }
+      }
+
+      if (!ok) {
+        setState(() => _message = '连接失败，请检查：\n'
+            '· 读卡器已通电且在手机附近\n'
+            '· 卡的密码正确（可在「更多功能」里重设）\n'
+            '· 仍失败请把控制台 [NativeLpa] 开头的日志发出来');
         return;
       }
       _stateSub?.cancel();
@@ -127,6 +150,50 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 问卡密码（PSK）。加密卡首次连接必需。
+  Future<String?> _askCardPassword() async {
+    final c = TextEditingController();
+    final v = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('卡密码'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '这张卡需要密码才能建立加密通道。\n密码一般印在卡上（可能是 Password 或 6 位数字）。',
+              style: TextStyle(fontSize: 12, color: AppColors.muted, height: 1.5),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: c,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, c.text.trim()),
+            child: const Text('连接'),
+          ),
+        ],
+      ),
+    );
+    c.dispose();
+    return (v == null || v.isEmpty) ? null : v;
   }
 
   Future<void> _disconnect() async {

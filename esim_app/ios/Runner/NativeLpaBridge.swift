@@ -74,6 +74,15 @@ final class NativeLpaBridge: NSObject {
 
   private var bleDevice: EuiccBleDevice?
   private var client: LPAdClient { LPAdClient.shared }
+  /// 加密卡走 SecurityBleDevice。默认 true（覆盖面更广）；
+  /// Dart 侧可通过 setSecureMode 切换，方便对比排查。
+  private var preferSecure = true
+
+  /// 卡密码（PSK）。SDK 在阻塞线程上问密码，弹不了框，只能回填已存的。
+  private var cachedPsk: String {
+    get { UserDefaults.standard.string(forKey: "app.esim.cardPsk") ?? "" }
+    set { UserDefaults.standard.set(newValue, forKey: "app.esim.cardPsk") }
+  }
   private var createdClient = false
   private var connectedPeripheral: CBPeripheral?
 
@@ -96,6 +105,13 @@ final class NativeLpaBridge: NSObject {
     // 4-byte length prefix, matches current LPA firmware (see demo comment).
     eSIMManagerConfig.bleDataLengthSize = 4
   }
+
+  /// GATT 常量，与 demo 的 EuiccGattAttributes 完全一致。
+  /// 文档 3.2.6 要求显式设置；不设的话 SDK 用内置默认值，一旦固件换了
+  /// UUID（或大小写不一致）特征就发现不到，设备会被判为 invalid。
+  private static let euiccService = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+  private static let euiccRx = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+  private static let euiccTx = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
   // MARK: - Method dispatch
 
@@ -216,6 +232,23 @@ final class NativeLpaBridge: NSObject {
           iccid: iccid, nickname: nick))]
       }
 
+    case "setSecureMode":
+      // args: {secure: bool}  默认 true
+      let secure = args["secure"] as? Bool ?? true
+      preferSecure = secure
+      NSLog("[NativeLpa] secure mode = %@", secure ? "on" : "off")
+      result(nil)
+
+    case "setCardPassword":
+      // args: {password: String}  空串表示清除
+      let pwd = args["password"] as? String ?? ""
+      cachedPsk = pwd
+      NSLog("[NativeLpa] card password %@", pwd.isEmpty ? "cleared" : "set")
+      result(nil)
+
+    case "hasCardPassword":
+      result(["has": !cachedPsk.isEmpty])
+
     case "getDefaultSmdp":
       runSdk(result: result) { [weak self] in
         guard let self, self.createdClient else { return ["address": NSNull()] }
@@ -280,10 +313,38 @@ final class NativeLpaBridge: NSObject {
 
       self.teardownConnectionSync()
 
-      let device = EuiccBleDevice(
+      // 文档 3.2.6：显式设置 GATT UUID，不依赖 SDK 默认值。
+      let probe = EuiccBleDevice(
         bleManager: central,
         blePeripheral: peripheral,
         bleDataLengthSize: 4)
+      probe.setEuiccBleServiceUUID(
+        serviceUUID: Self.euiccService,
+        rxUUID: Self.euiccRx,
+        txUUID: Self.euiccTx)
+
+      // 加密卡必须用 SecurityBleDevice 建链，否则后续 APDU 全部走不通。
+      // 用 secureMode 开关切换：默认先走加密版（覆盖面更广），
+      // 密码在需要时由 SDK 回调上来问用户。
+      let identity = peripheral.identifier.uuidString
+      let device: EuiccBleDevice
+      if self.preferSecure {
+        let secure = SecurityBleDevice(
+          identity: identity,
+          bleManager: central,
+          blePeripheral: peripheral,
+          bleDataLengthSize: 4)
+        secure.setEuiccBleServiceUUID(
+          serviceUUID: Self.euiccService,
+          rxUUID: Self.euiccRx,
+          txUUID: Self.euiccTx)
+        device = secure
+        NSLog("[NativeLpa] using SecurityBleDevice (identity=%@)", identity)
+      } else {
+        device = probe
+        NSLog("[NativeLpa] using plain EuiccBleDevice")
+      }
+
       self.bleDevice = device
       self.connectedPeripheral = peripheral
 
@@ -309,6 +370,17 @@ final class NativeLpaBridge: NSObject {
         // CCCD subscription and MTU negotiation are still in flight, so we must
         // NOT read device info here. isValidDeviceCallback fires once the SDK
         // has finished all of that and the card actually answers.
+      }
+
+      // 加密卡会同步回调要密码。SDK 在 sdkQueue 上阻塞等待，
+      // 所以这里不能弹主线程 Dialog，必须先返回上次成功用过的密码
+      // （存在 UserDefaults 里），首次不知道就让 SDK 失败并在 Dart 侧提示输入。
+      LPAdClient.setUserAuthenticationCallback { [weak self] () -> String? in
+        guard let self else { return nil }
+        let psk = self.cachedPsk
+        NSLog("[NativeLpa] SDK asked for PSK -> %@",
+              psk.isEmpty ? "none stored, giving up" : "replying cached")
+        return psk.isEmpty ? nil : psk
       }
 
       device.isValidDeviceCallback = { [weak self] valid in

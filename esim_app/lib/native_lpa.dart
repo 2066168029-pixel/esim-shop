@@ -191,6 +191,27 @@ class NativeLpa {
     return r?['connected'] as bool? ?? false;
   }
 
+  /// 切换加密/明文建链模式。默认加密（覆盖面更广）。
+  static Future<void> setSecureMode(bool secure) async {
+    await _method.invokeMethod<void>('setSecureMode', {'secure': secure});
+  }
+
+  /// 存入卡密码（PSK）。加密卡首次连接必须提供，之后会自动复用。
+  /// 传空串表示清除。
+  static Future<void> setCardPassword(String password) async {
+    await _method.invokeMethod<void>('setCardPassword', {'password': password});
+  }
+
+  /// 是否已经存过卡密码。
+  static Future<bool> get hasCardPassword async {
+    try {
+      final r = await _method.invokeMethod<Map>('hasCardPassword');
+      return (r?['has'] as bool?) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> disconnect() => _method.invokeMethod<void>('disconnect');
 
   static Future<String?> getEid() async {

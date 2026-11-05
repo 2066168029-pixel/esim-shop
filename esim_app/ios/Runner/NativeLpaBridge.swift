@@ -239,14 +239,16 @@ final class NativeLpaBridge: NSObject {
       // args: {secure: bool}  默认 true
       let secure = args["secure"] as? Bool ?? true
       preferSecure = secure
-      log("secure mode = \(secure ? "on" : "off")")
+      let modeStr = secure ? "on" : "off"
+      log("secure mode = \(modeStr)")
       result(nil)
 
     case "setCardPassword":
       // args: {password: String}  空串表示清除
       let pwd = args["password"] as? String ?? ""
       cachedPsk = pwd
-      log("card password \(pwd.isEmpty ? "cleared" : "set")")
+      let pwdState = pwd.isEmpty ? "cleared" : "set"
+      log("card password \(pwdState)")
       result(nil)
 
     case "hasCardPassword":
@@ -406,7 +408,8 @@ final class NativeLpaBridge: NSObject {
         guard let self else { return }
         progress()
         self.emit(["type": "valid", "valid": valid])
-        log("isValidDevice -> \(valid ? "true" : "false")")
+        let validStr = valid ? "true" : "false"
+        log("isValidDevice -> \(validStr)")
         if valid {
           self.sdkQueue.async { self.primeClient(done: done) }
         } else {
@@ -592,7 +595,7 @@ final class NativeLpaBridge: NSObject {
   /// 统一日志：既打 NSLog（Xcode 可见），也通过 EventChannel 发给 Dart，
   /// 这样 App 内能直接看到进度，不需要连 Mac。
   private func log(_ msg: String) {
-    log("%@", msg)
+    NSLog("[NativeLpa] %@", msg)
     emit(["type": "log", "message": msg])
   }
 

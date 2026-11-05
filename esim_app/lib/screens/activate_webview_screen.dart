@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../theme.dart';
+import '../i18n.dart';
+import '../store.dart';
 
 /// In-app WebView that opens the upstream activation portal's DEVICE page.
 ///
@@ -19,13 +22,15 @@ class ActivateWebViewScreen extends StatefulWidget {
   final String iccid;
   final String title;
 
-  const ActivateWebViewScreen({super.key, this.iccid = '', this.title = '激活'});
+  const ActivateWebViewScreen({super.key, this.iccid = '', this.title = ''});
 
   @override
   State<ActivateWebViewScreen> createState() => _ActivateWebViewScreenState();
 }
 
 class _ActivateWebViewScreenState extends State<ActivateWebViewScreen> {
+  L get t => context.read<AppState>().t;
+
   late final WebViewController _controller;
   int _progress = 0;
   bool _failed = false;
@@ -148,15 +153,15 @@ class _ActivateWebViewScreenState extends State<ActivateWebViewScreen> {
           children: [
             const Icon(Icons.wifi_off_rounded, size: 54, color: AppColors.muted),
             const SizedBox(height: 14),
-            const Text('激活页面无法加载',
+            Text(t.wvActivateFailed,
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            const Text('请检查手机网络后点击“重试”。\n如果一直失败，请确认：\n• 手机已联网（可切换 WiFi / 流量试试）\n• 未开启会拦截第三方页面的 VPN / 广告拦截',
+            Text(t.wvCheckNetwork,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: AppColors.textSub, height: 1.6)),
             if (_lastError != null) ...[
               const SizedBox(height: 8),
-              Text('错误：$_lastError',
+              Text(t.wvError('$_lastError'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 11, color: AppColors.muted)),
             ],
@@ -166,7 +171,7 @@ class _ActivateWebViewScreenState extends State<ActivateWebViewScreen> {
               children: [
                 OutlinedButton(
                   onPressed: () => _openInBrowser(),
-                  child: const Text('用浏览器打开'),
+                  child: Text(t.wvOpenInBrowser),
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
@@ -177,7 +182,7 @@ class _ActivateWebViewScreenState extends State<ActivateWebViewScreen> {
                     });
                     _boot();
                   },
-                  child: const Text('重试'),
+                  child: Text(t.wvRetry),
                 ),
               ],
             ),

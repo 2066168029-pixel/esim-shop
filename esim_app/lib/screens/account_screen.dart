@@ -526,6 +526,7 @@ Future<void> showChangePasswordSheet(BuildContext context) async {
     backgroundColor: Colors.transparent,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setSheet) {
+        final t = context.read<AppState>().t;
         final insets = MediaQuery.of(ctx).viewInsets.bottom;
         void msg(String m, {bool ok = false}) {
           ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
@@ -536,14 +537,14 @@ Future<void> showChangePasswordSheet(BuildContext context) async {
         }
 
         Future<void> submit() async {
-          if (next.text.length < 6) return msg('新密码至少 6 位');
-          if (next.text != again.text) return msg('两次输入的新密码不一致');
+          if (next.text.length < 6) return msg(t.errPasswordTooShort);
+          if (next.text != again.text) return msg(t.acPwdMismatch);
           setSheet(() => busy = true);
           try {
             await context.read<AppState>().api.changePassword(current.text, next.text);
             if (!ctx.mounted) return;
             Navigator.pop(ctx);
-            msg('密码已修改', ok: true);
+            msg(t.acPwdChanged, ok: true);
           } catch (e) {
             msg(e.toString().replaceFirst('Exception: ', ''));
           } finally {
@@ -564,17 +565,17 @@ Future<void> showChangePasswordSheet(BuildContext context) async {
               const SizedBox(height: 16),
               Text(context.read<AppState>().t.changePassword, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
               const SizedBox(height: 16),
-              TextField(controller: current, obscureText: true, decoration: const InputDecoration(labelText: '当前密码')),
+              TextField(controller: current, obscureText: true, decoration: InputDecoration(labelText: t.acCurrentPwd)),
               const SizedBox(height: 12),
-              TextField(controller: next, obscureText: true, decoration: const InputDecoration(labelText: '新密码（至少 6 位）')),
+              TextField(controller: next, obscureText: true, decoration: InputDecoration(labelText: t.acNewPwd)),
               const SizedBox(height: 12),
-              TextField(controller: again, obscureText: true, decoration: const InputDecoration(labelText: '确认新密码')),
+              TextField(controller: again, obscureText: true, decoration: InputDecoration(labelText: t.acConfirmPwd)),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: busy ? null : submit,
                 child: busy
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('保存'),
+                    : Text(t.acSave),
               ),
             ]),
           ),

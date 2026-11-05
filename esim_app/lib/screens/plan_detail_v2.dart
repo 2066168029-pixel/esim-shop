@@ -248,10 +248,10 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
 
   Widget _specGrid() {
     final items = <(IconData, String, String)>[
-      (Icons.data_usage, '流量', p.dataGb > 0 ? '${_num(p.dataGb)} GB' : '不限'),
-      (Icons.schedule, '有效期', p.validityDays > 0 ? '${p.validityDays} 天' : '—'),
+      (Icons.data_usage, t.pdData, p.dataGb > 0 ? '${_num(p.dataGb)} GB' : t.pdUnlimited),
+      (Icons.schedule, t.pdValidity, p.validityDays > 0 ? t.pdDays(p.validityDays) : '—'),
       (Icons.sim_card_outlined, t.kindSim, p.kind == 'physical_sim' ? t.kindPhysicalCard : 'eSIM'),
-      (Icons.inventory_2_outlined, '库存', p.stock < 0 ? '不限' : '${p.stock}'),
+      (Icons.inventory_2_outlined, t.pvStock, p.stock < 0 ? t.pdUnlimited : '${p.stock}'),
     ];
 
     return Container(
@@ -301,7 +301,7 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('套餐说明', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+          Text(t.pdDescription, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           Text(
             p.description,
@@ -328,8 +328,8 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
           Expanded(
             child: Text(
               p.kind == 'physical_sim'
-                  ? '实体卡需要邮寄，下单后请保持手机号畅通。'
-                  : '购买后立即获得激活码，扫码即可安装。',
+                  ? t.pvShipNote
+                  : t.pvInstantNote,
               style: const TextStyle(fontSize: 12.5, height: 1.6, color: Color(0xFF1E4B8F)),
             ),
           ),
@@ -356,7 +356,7 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('价格', style: TextStyle(fontSize: 11, color: AppColors.muted)),
+              Text(t.pvPrice, style: TextStyle(fontSize: 11, color: AppColors.muted)),
               Text(
                 app.price(p.price),
                 style: const TextStyle(
@@ -386,7 +386,7 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
                     )
                   : const Icon(Icons.add_shopping_cart, size: 19),
               label: Text(
-                _adding ? '添加中…' : '加入购物车',
+                _adding ? t.pvAdding : t.pdAddToCart,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
             ),
@@ -434,7 +434,7 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
     try {
       app.addToCart(p);
       if (!mounted) return;
-      showSnack(context, '已加入购物车');
+      showSnack(context, t.pdAddedToCart);
       // 直接进购物车
       await Navigator.push(
         context,

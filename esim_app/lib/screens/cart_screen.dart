@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../countries.dart';
+import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -13,12 +14,13 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.read<AppState>().t;
     final app = context.watch<AppState>();
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(title: const Text('购物车')),
+      appBar: AppBar(title: Text(t.ctTitle)),
       body: app.cart.isEmpty
-          ? emptyBox('购物车还是空的\n去挑一个目的地吧', icon: Icons.shopping_bag_outlined)
+          ? emptyBox(t.ctEmptyHint, icon: Icons.shopping_bag_outlined)
           : Column(
               children: [
                 Expanded(
@@ -87,7 +89,7 @@ class CartScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${c.nameZh} · ${p.dataGb > 0 ? '${p.dataGb}GB' : '语音'} · ${p.validityDays}天',
+                  '${c.nameZh} · ${p.dataGb > 0 ? '${p.dataGb}GB' : 'Voice'} · ${p.validityDays}天',
                   style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
                 ),
                 const SizedBox(height: 9),

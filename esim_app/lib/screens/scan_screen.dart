@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_zxing/flutter_zxing.dart';
+import '../i18n.dart';
+import '../store.dart';
 
 /// Full-screen QR / barcode scanner built on **flutter_zxing** (ZXing native,
 /// not Google MLKit). ZXing decodes both 2D (QR / DataMatrix / PDF417) and 1D
@@ -66,12 +69,13 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.read<AppState>().t;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('扫描二维码 / 条形码'),
+        title: Text(t.snTitle),
       ),
       body: ReaderWidget(
         // Any format: QR + Code128/39/93 + EAN/UPC + ITF + DataMatrix/PDF417.

@@ -108,7 +108,7 @@ class _InviteScreenState extends State<InviteScreen> {
   String _shareText() {
     final code = _data?['code'] ?? '';
     final path = _data?['invite_path'] ?? '';
-    return 'OnlyLinkCard 邀请好友立减 5%\n邀请码：$code\n$path';
+    return 'OnlyLinkCard 5% off\nCode: $code\n$path';
   }
 
   @override

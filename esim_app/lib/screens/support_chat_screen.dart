@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../store.dart';
+import '../i18n.dart';
+import '../store.dart';
 import '../theme.dart';
 
 /// Customer-facing support chat. The device keeps an opaque `session_key` so the
@@ -18,6 +20,8 @@ class SupportChatScreen extends StatefulWidget {
 }
 
 class _SupportChatScreenState extends State<SupportChatScreen> {
+  L get t => context.read<AppState>().t;
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   SupportChat? _chat;
@@ -62,7 +66,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         chat = await app.api.supportStart(
           name: app.user?.fullName ?? '',
           email: app.user?.email ?? '',
-          subject: '在线咨询',
+          subject: t.scOnlineConsult,
           sessionKey: _sessionKey ?? '',
         );
         _sessionKey = chat.sessionKey;
@@ -101,7 +105,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       _scrollDown();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败：$e'), backgroundColor: AppColors.danger));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.scSendFailed), backgroundColor: AppColors.danger));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -136,15 +140,15 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               child: const Icon(Icons.support_agent, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 10),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('在线客服', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.text)),
+                Text(t.scTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.text)),
                 Row(children: [
                   _Dot(),
                   SizedBox(width: 5),
-                  Text('通常几分钟内回复', style: TextStyle(fontSize: 11.5, color: AppColors.textSub, fontWeight: FontWeight.w400)),
+                  Text(t.scReplySoon, style: TextStyle(fontSize: 11.5, color: AppColors.textSub, fontWeight: FontWeight.w400)),
                 ]),
               ],
             ),
@@ -188,28 +192,28 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               child: const Icon(Icons.wifi_off_rounded, color: AppColors.danger, size: 34),
             ),
             const SizedBox(height: 16),
-            const Text('连接客服失败', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(t.scConnectFailed, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            const SizedBox(
+            SizedBox(
               width: 250,
-              child: Text('请检查网络后重试。如果一直失败，可稍后再试。',
+              child: Text(t.scCheckNetwork,
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSub, height: 1.5)),
             ),
             const SizedBox(height: 18),
-            ElevatedButton.icon(onPressed: _boot, icon: const Icon(Icons.refresh, size: 18), label: const Text('重试')),
+            ElevatedButton.icon(onPressed: _boot, icon: const Icon(Icons.refresh, size: 18), label: Text('重试')),
           ],
         ),
       );
 
   Widget _agentBar() {
-    final who = _chat?.agentName.isNotEmpty == true ? _chat!.agentName : '客服小助手';
+    final who = _chat?.agentName.isNotEmpty == true ? _chat!.agentName : t.scAgent;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(color: AppColors.sky, borderRadius: BorderRadius.circular(20)),
-          child: Text('为您服务：$who', style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+          child: Text(t.scServing(who), style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
         ),
       ),
     );
@@ -222,7 +226,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       decoration: BoxDecoration(color: const Color(0xFFFFF8E6), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFFE0A3))),
       child: Row(
         children: [
-          const Expanded(child: Text('本次服务已结束，为客服评分：', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
+          Expanded(child: Text(t.scRate, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
           ...List.generate(5, (i) => GestureDetector(
                 onTap: () => _rate(i + 1),
                 child: const Padding(padding: EdgeInsets.symmetric(horizontal: 2), child: Icon(Icons.star_border_rounded, color: AppColors.gold, size: 26)),
@@ -238,11 +242,11 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       final c = await context.read<AppState>().api.supportRate(_sessionKey!, stars, '');
       if (mounted) setState(() => _chat = c);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('感谢您的评价！'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.scThanksShort), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('提交失败：$e'), backgroundColor: AppColors.danger));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.scSubmitFailed), backgroundColor: AppColors.danger));
       }
     }
   }
@@ -257,11 +261,11 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               child: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary, size: 34),
             ),
             const SizedBox(height: 16),
-            const Text('有什么可以帮您？', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(t.scWhatCanIHelp, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            const SizedBox(
+            SizedBox(
               width: 240,
-              child: Text('发送您的问题，客服会尽快回复。可咨询激活、退款、套餐等问题。',
+              child: Text(t.scIntro,
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSub, height: 1.5)),
             ),
           ],
@@ -310,7 +314,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '${m.isAgent ? (m.agentName.isNotEmpty ? m.agentName : '客服') : '我'} · ${_hm(m.createdAt)}',
+                      '${m.isAgent ? (m.agentName.isNotEmpty ? m.agentName : t.scAgent) : t.scMe} · ${_hm(m.createdAt)}',
                       style: TextStyle(fontSize: 10, color: me ? Colors.white70 : AppColors.muted),
                     ),
                   ),
@@ -352,7 +356,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               maxLines: 4,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: '输入消息…',
+                hintText: t.scInputHint,
                 filled: true,
                 fillColor: AppColors.bg,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

@@ -17,6 +17,8 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  L get t => context.read<AppState>().t;
+
   List<Plan>? _plans;
   String _q = "";
 
@@ -41,13 +43,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(title: const Text('选择目的地')),
+      appBar: AppBar(title: Text(t.seTitle)),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              decoration: const InputDecoration(hintText: '搜索目的地', prefixIcon: Icon(Icons.search, color: AppColors.muted)),
+              decoration: InputDecoration(hintText: t.seHint, prefixIcon: Icon(Icons.search, color: AppColors.muted)),
               onChanged: (v) => setState(() => _q = v.trim()),
             ),
           ),
@@ -55,7 +57,7 @@ class _SearchScreenState extends State<SearchScreen> {
             child: _plans == null
                 ? loadingBox()
                 : all.isEmpty
-                    ? emptyBox('没有找到相关目的地', icon: Icons.search_off)
+                    ? emptyBox(t.seNoResult, icon: Icons.search_off)
                     : ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: all.length,

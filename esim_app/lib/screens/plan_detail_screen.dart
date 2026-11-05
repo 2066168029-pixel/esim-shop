@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../countries.dart';
 import '../currency.dart';
+import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 
@@ -21,6 +22,8 @@ class PlanDetailScreen extends StatefulWidget {
 }
 
 class _PlanDetailScreenState extends State<PlanDetailScreen> {
+  L get t => context.read<AppState>().t;
+
   late Plan _plan;
   bool _loading = false;
 
@@ -52,11 +55,11 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('已加入购物车：${_plan.title}'),
+        content: Text('${t.pdAddedToCart}: ${_plan.title}'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
-          label: '去结算',
+          label: t.pdGoCheckout,
           textColor: Colors.white,
           onPressed: () {
             Navigator.pop(context);
@@ -75,7 +78,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('套餐详情'),
+        title: Text(t.pdTitle),
         actions: [
           if (_loading)
             const Padding(
@@ -144,12 +147,12 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      _spec(Icons.data_usage, '流量', p.dataGb > 0 ? '${_num(p.dataGb)} GB' : '不限'),
+                      _spec(Icons.data_usage, t.pdData, p.dataGb > 0 ? '${_num(p.dataGb)} GB' : t.pdUnlimited),
                       _divider(),
-                      _spec(Icons.schedule, '有效期', '${p.validityDays} 天'),
+                      _spec(Icons.schedule, t.pdValidity, t.pdDays(p.validityDays)),
                       if (p.kind == 'quota') ...[
                         _divider(),
-                        _spec(Icons.layers, '卡槽', '+${p.quotaSlots}'),
+                        _spec(Icons.layers, t.pdSlots, '+${p.quotaSlots}'),
                       ],
                     ],
                   ),
@@ -163,29 +166,29 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                         Expanded(
                           child: _miniStat(
                             Icons.call,
-                            '通话',
-                            '${p.voiceMinutes} 分钟',
+                            t.pdVoice,
+                            t.pdMinutes(p.voiceMinutes),
                           ),
                         ),
                       if (p.voiceMinutes > 0 && p.smsCount > 0) const SizedBox(width: 12),
                       if (p.smsCount > 0)
                         Expanded(
-                          child: _miniStat(Icons.sms, '短信', '${p.smsCount} 条'),
+                          child: _miniStat(Icons.sms, t.pdSms, t.pdMessages(p.smsCount)),
                         ),
                     ],
                   ),
                 ],
 
                 const SizedBox(height: 20),
-                const Text('套餐说明', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(t.pdDescription, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Text(
-                  p.description.isNotEmpty ? p.description : '暂无详细说明。',
+                  p.description.isNotEmpty ? p.description : t.pdNoDescription,
                   style: const TextStyle(fontSize: 13.5, height: 1.7, color: AppColors.textSub),
                 ),
 
                 const SizedBox(height: 20),
-                const Text('使用须知', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(t.pdNotice, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 const _Bullet('购买后可在「订单」中查看 eSIM 二维码，扫码即可安装。'),
                 const _Bullet('请在有效期内激活，激活后开始计算流量与天数。'),
@@ -201,8 +204,8 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                       color: AppColors.danger.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppRadii.btn),
                     ),
-                    child: const Text(
-                      '该套餐暂时缺货',
+                    child: Text(
+                      t.pdOutOfStock,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700),
                     ),
@@ -213,7 +216,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _addToCart,
                       icon: const Icon(Icons.add_shopping_cart, size: 18),
-                      label: const Text('加入购物车'),
+                      label: Text(t.pdAddToCart),
                     ),
                   ),
                 const SizedBox(height: 12),
@@ -221,7 +224,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('返回'),
+                    child: Text(t.pdBack),
                   ),
                 ),
                 const SizedBox(height: 8),

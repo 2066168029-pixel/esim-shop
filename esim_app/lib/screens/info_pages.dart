@@ -36,12 +36,12 @@ class HelpPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.watch<AppState>().t;
-    const faqs = [
-      ("如何激活 eSIM？", "购买后进入「订单」→「查看二维码」，用手机设置里的「添加 eSIM」扫描即可。"),
-      ("支持哪些手机？", "iPhone XS 及以上、大部分近年安卓旗舰均支持 eSIM。可在手机设置中搜索「eSIM」确认。"),
-      ("流量用完怎么办？", "可在「我的套餐」里「再次购买」续订，或联系客服。"),
-      ("能退款吗？", "未激活的 eSIM 支持 7 天内退款，激活后不支持。"),
-      ("落地没网怎么办？", "确认已开启数据漫游，并在手机设置中把本 eSIM 设为移动数据主卡。"),
+    final faqs = [
+      (t.faq1Q, t.faq1A),
+      (t.faq2Q, t.faq2A),
+      (t.faq3Q, t.faq3A),
+      (t.faq4Q, t.faq4A),
+      (t.faq5Q, t.faq5A),
     ];
     return _SimplePage(
       title: t.helpCenter,
@@ -53,10 +53,10 @@ class HelpPage extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t.support247, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                const Text('在线客服 · 秒回', style: TextStyle(color: AppColors.textSub, fontSize: 12.5)),
+                Text(t.helpOnline, style: TextStyle(color: AppColors.textSub, fontSize: 12.5)),
               ]),
             ),
-            FilledButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())), child: const Text('联系')),
+            FilledButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())), child: Text(t.contactSupport)),
           ]),
         ]),
         Text(t.faq, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
@@ -77,10 +77,10 @@ class NotificationsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.watch<AppState>().t;
-    const items = [
-      (Icons.campaign_outlined, "新套餐上线", "越南 / 日本 5G 套餐已上线，限时 9 折。"),
-      (Icons.receipt_long_outlined, "订单已完成", "你的订单已出 eSIM，请在「订单」中查看二维码。"),
-      (Icons.card_giftcard_outlined, "优惠券到账", "WELCOME10 已发放到你的账户，下单可用。"),
+    final items = [
+      (Icons.campaign_outlined, t.notif1T, t.notif1B),
+      (Icons.receipt_long_outlined, t.notif2T, t.notif2B),
+      (Icons.card_giftcard_outlined, t.notif3T, t.notif3B),
     ];
     return _SimplePage(
       title: t.notifications,
@@ -114,26 +114,26 @@ class PaymentPage extends StatelessWidget {
           Row(children: [
             const Icon(Icons.chat_bubble, color: Color(0xFF22C55E), size: 26),
             const SizedBox(width: 12),
-            const Expanded(child: Text('微信支付', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+            Expanded(child: Text(t.payWechat, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
             const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
           ]),
         ]),
         _card(context, [
-          Row(children: const [
+          Row(children: [
             Icon(Icons.account_balance_wallet, color: Color(0xFF3B82F6), size: 26),
             SizedBox(width: 12),
-            Expanded(child: Text('支付宝', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+            Expanded(child: Text(t.payAlipay, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
           ]),
         ]),
         _card(context, [
-          Row(children: const [
+          Row(children: [
             Icon(Icons.credit_card, color: AppColors.textSub, size: 26),
             SizedBox(width: 12),
-            Expanded(child: Text('银行卡 / 信用卡', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+            Expanded(child: Text(t.payCard, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
           ]),
         ]),
         const SizedBox(height: 4),
-        const Text('支付渠道接入中，当前演示环境使用 Mock 支付。', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        Text(t.payChannelsSoon, style: TextStyle(color: AppColors.muted, fontSize: 12)),
       ],
     );
   }
@@ -198,7 +198,7 @@ class SettingsPage extends StatelessWidget {
           ),
         ]),
         _card(context, [
-          ListTile(contentPadding: EdgeInsets.zero, title: const Text('清除缓存'), trailing: const Icon(Icons.chevron_right), onTap: () => _snack(context, '缓存已清除')),
+          ListTile(contentPadding: EdgeInsets.zero, title: Text(t.settingsClearCache), trailing: const Icon(Icons.chevron_right), onTap: () => _snack(context, t.cacheCleared)),
         ]),
       ],
     );
@@ -210,8 +210,9 @@ class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
   @override
   Widget build(BuildContext context) {
+    final t = context.read<AppState>().t;
     return _SimplePage(
-      title: '关于我们',
+      title: t.aboutUs,
       children: [
         _card(context, [
           Row(children: [
@@ -220,16 +221,16 @@ class AboutPage extends StatelessWidget {
             const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Onlylink eSIM', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
               SizedBox(height: 4),
-              Text('版本 v1.0.0', style: TextStyle(color: AppColors.textSub, fontSize: 12.5)),
+              Text('\${appVersion()} ', style: TextStyle(color: AppColors.textSub, fontSize: 12.5)),
             ]),
           ]),
         ]),
         _card(context, [
-          const Text('全球旅行上网，一个二维码搞定。覆盖 200+ 国家和地区，落地即用，无需换卡。',
+          Text(t.aboutSlogan,
               style: TextStyle(fontSize: 13.5, height: 1.6, color: AppColors.text)),
         ]),
         _card(context, [
-          ListTile(contentPadding: EdgeInsets.zero, title: const Text('用户协议'), trailing: const Icon(Icons.chevron_right), onTap: () => _snack(context, '打开用户协议')),
+          ListTile(contentPadding: EdgeInsets.zero, title: Text(t.termsOfService), trailing: const Icon(Icons.chevron_right), onTap: () => _snack(context, t.openTerms)),
         ]),
       ],
     );

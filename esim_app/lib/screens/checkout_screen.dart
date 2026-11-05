@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../api.dart';
 import '../currency.dart';
+import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../pay_icons.dart';
@@ -16,6 +17,8 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  L get t => context.read<AppState>().t;
+
   final _email = TextEditingController();
   final _name = TextEditingController();
   final _phone = TextEditingController();
@@ -36,7 +39,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// Fallback used only when the backend has no enabled channels configured.
   static const _fallback = [
-    ("mock", "测试支付（Mock）", "mock"),
+    ("mock", "Mock", "mock"),
   ];
 
   @override
@@ -121,11 +124,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _submit() async {
     final app = context.read<AppState>();
     if (_email.text.trim().isEmpty) {
-      _snack('请填写邮箱', error: true);
+      _snack(t.coEmailRequired, error: true);
       return;
     }
     if (_needsShipping && _address.text.trim().isEmpty) {
-      _snack('实体卡需要填写收货地址', error: true);
+      _snack(t.coAddressRequired, error: true);
       return;
     }
     setState(() => _busy = true);
@@ -160,7 +163,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final app = context.watch<AppState>();
     final t = app.t;
     return Scaffold(
-      appBar: AppBar(title: const Text('确认订单')),
+      appBar: AppBar(title: Text(t.coTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -168,12 +171,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('联系方式', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(t.coContact, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(hintText: '邮箱（用于接收 eSIM）'),
+                  decoration: InputDecoration(hintText: t.coEmailHint),
                 ),
               ],
             ),
@@ -184,9 +187,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('收货信息（实体卡）', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(t.coShipInfo, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   const SizedBox(height: 12),
-                  TextField(controller: _name, decoration: const InputDecoration(hintText: '收件人姓名')),
+                  TextField(controller: _name, decoration: InputDecoration(hintText: t.coNameHint)),
                   const SizedBox(height: 10),
                   TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '联系电话')),
                   const SizedBox(height: 10),
@@ -200,7 +203,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('优惠码', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(t.coCoupon, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -208,14 +211,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: TextField(
                         controller: _coupon,
                         textCapitalization: TextCapitalization.characters,
-                        decoration: const InputDecoration(hintText: '输入优惠码，如 WELCOME10'),
+                        decoration: InputDecoration(hintText: t.coCouponHint),
                       ),
                     ),
                     const SizedBox(width: 10),
                     OutlinedButton(
                       style: OutlinedButton.styleFrom(minimumSize: const Size(80, 50)),
                       onPressed: _applyCoupon,
-                      child: const Text('使用'),
+                      child: Text(t.coApply),
                     ),
                   ],
                 ),
@@ -227,7 +230,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('支付方式', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(t.coPayment, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const SizedBox(height: 8),
                 if (_loadingPayments)
                   const Padding(
@@ -260,8 +263,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           AppCard(
             child: Column(
               children: [
-                _amountRow('商品小计', _subtotal),
-                if (_discount > 0) _amountRow('优惠（${_couponResult!.code}）', -_discount),
+                _amountRow(t.coSubtotal, _subtotal),
+                if (_discount > 0) _amountRow(t.coDiscountLine(_couponResult!.code), -_discount),
                 if (app.isLoggedIn && _voucherBalance > 0)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -286,7 +289,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const Divider(height: 22),
                 Row(
                   children: [
-                    const Text('应付金额', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    Text(t.coPayable, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                     const Spacer(),
                     Text(context.read<AppState>().price(_total),
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary)),
@@ -300,10 +303,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             onPressed: _busy ? null : _submit,
             child: _busy
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text('支付 ${context.read<AppState>().price(_total)}'),
+                : Text(t.coPayAmount(context.read<AppState>().price(_total))),
           ),
           const SizedBox(height: 8),
-          const Text('支付方式由后台配置，实时同步。',
+          Text(t.coPaymentNote,
               textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.muted)),
         ],
       ),
@@ -370,7 +373,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ]),
       subtitle: g.mode == 'live'
           ? null
-          : const Text('人工确认', style: TextStyle(fontSize: 11, color: AppColors.muted)),
+          : Text(t.coManualConfirm, style: TextStyle(fontSize: 11, color: AppColors.muted)),
       selected: selected,
     );
   }

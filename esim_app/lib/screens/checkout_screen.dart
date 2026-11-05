@@ -5,6 +5,7 @@ import '../api.dart';
 import '../currency.dart';
 import '../store.dart';
 import '../theme.dart';
+import '../pay_icons.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
 
@@ -23,6 +24,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _notes = TextEditingController();
 
   CouponResult? _couponResult;
+  // 现金券（人民币余额）：默认不用，用户显式勾选才抵扣
+  bool _useVoucher = false;
+  double _voucherBalance = 0;
   bool _busy = false;
   String _payMethod = "";
 
@@ -40,6 +44,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _email.text = context.read<AppState>().user?.email ?? "";
     _loadPayments();
+    _loadVoucher();
+  }
+
+  /// 现金券余额（人民币）。未登录或接口失败时保持 0，界面自然不显示开关。
+  Future<void> _loadVoucher() async {
+    final app = context.read<AppState>();
+    if (!app.isLoggedIn) return;
+    try {
+      final v = await app.api.myVoucher();
+      if (!mounted) return;
+      setState(() {
+        _voucherBalance = (v['balance'] as num?)?.toDouble() ?? 0;
+      });
+    } catch (_) {
+      // 忽略：没有现金券就不显示抵扣入口
+    }
   }
 
   Future<void> _loadPayments() async {
@@ -111,6 +131,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _busy = true);
     try {
       final order = await app.api.checkout(
+        useVoucher: _useVoucher && _voucherBalance > 0,
         items: app.cart.map((l) => {"plan_id": l.plan.id, "quantity": l.quantity}).toList(),
         email: _email.text.trim(),
         couponCode: _couponResult?.valid == true ? _couponResult!.code : "",
@@ -136,6 +157,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final t = app.t;
     return Scaffold(
       appBar: AppBar(title: const Text('确认订单')),
       body: ListView(
@@ -239,6 +262,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 _amountRow('商品小计', _subtotal),
                 if (_discount > 0) _amountRow('优惠（${_couponResult!.code}）', -_discount),
+                if (app.isLoggedIn && _voucherBalance > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.redeem_rounded,
+                            size: 17, color: AppColors.success),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${t.useVoucher}（¥${_voucherBalance.toStringAsFixed(2)}）',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Switch(
+                          value: _useVoucher,
+                          onChanged: (v) => setState(() => _useVoucher = v),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Divider(height: 22),
                 Row(
                   children: [
@@ -275,7 +319,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       contentPadding: EdgeInsets.zero,
       dense: true,
       title: Row(children: [
-        Icon(icon, color: color, size: 20),
+        if (PayIcons.iconUrl(value).isNotEmpty)
+          SizedBox(width: 28, child: PayIcon(provider: value, size: 22))
+        else
+          Icon(icon, color: color, size: 20),
         const SizedBox(width: 10),
         Text(label),
       ]),
@@ -314,7 +361,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       contentPadding: EdgeInsets.zero,
       dense: true,
       title: Row(children: [
-        Icon(icon, color: color, size: 20),
+        if (PayIcons.iconUrl(g.provider).isNotEmpty)
+          SizedBox(width: 28, child: PayIcon(provider: g.provider, size: 22))
+        else
+          Icon(icon, color: color, size: 20),
         const SizedBox(width: 10),
         Text(g.label),
       ]),

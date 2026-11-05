@@ -108,6 +108,127 @@ Widget errorBox(String msg) => Center(
       ),
     );
 
+/// Brand mark used on the sign-in / register screens.
+///
+/// This is the OnlyLinkCard artwork (SIM inside a globe with orbits) drawn
+/// natively instead of shipping the launcher PNG, so it stays crisp at any
+/// size and inherits the theme colour. It replaces the generic
+/// `Icons.sim_card` placeholder that used to stand in for the logo.
+class BrandMark extends StatelessWidget {
+  final double size;
+  final bool filled;
+  const BrandMark({super.key, this.size = 44, this.filled = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final side = size;
+    return Container(
+      width: side,
+      height: side,
+      decoration: BoxDecoration(
+        color: filled ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(side * 0.28),
+        boxShadow: filled
+            ? const [
+                BoxShadow(
+                    color: Color(0x1F1E3A8A),
+                    blurRadius: 18,
+                    offset: Offset(0, 6))
+              ]
+            : null,
+      ),
+      padding: EdgeInsets.all(side * 0.16),
+      child: CustomPaint(
+        painter: _BrandMarkPainter(
+          color: AppColors.primaryDark,
+          stroke: (side * 0.045).clamp(1.2, 3.0),
+        ),
+      ),
+    );
+  }
+}
+
+/// SIM card inside a globe with two orbital rings.
+///
+/// Geometry is expressed in a 0..100 box and scaled by the paint size, so the
+/// same painter works for a 24px chip and an 88px splash logo.
+class _BrandMarkPainter extends CustomPainter {
+  final Color color;
+  final double stroke;
+  const _BrandMarkPainter({required this.color, required this.stroke});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    Offset o(double x, double y) =>
+        Offset(x / 100 * size.width, y / 100 * size.height);
+    double s(double v) => v / 100 * size.shortestSide;
+
+    final c = o(50, 50);
+    final r = s(30);
+
+    // ---- two orbital ellipses, tilted opposite ways ----
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(-0.55);
+    canvas.drawOval(
+        Rect.fromCenter(center: Offset.zero, width: r * 2.85, height: r * 1.42), p);
+    canvas.restore();
+
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(0.55);
+    canvas.drawOval(
+        Rect.fromCenter(center: Offset.zero, width: r * 2.85, height: r * 1.42), p);
+    canvas.restore();
+
+    // ---- globe ----
+    canvas.drawCircle(c, r, p);
+    canvas.drawOval(
+        Rect.fromCenter(center: c, width: r * 2, height: r * 0.82), p);
+    canvas.drawOval(
+        Rect.fromCenter(center: c, width: r * 0.82, height: r * 2), p);
+
+    // ---- SIM card, knocked out of the globe so the lines do not collide ----
+    final simRect = Rect.fromCenter(
+        center: Offset(c.dx, c.dy + s(1)), width: r * 0.95, height: r * 1.10);
+    final sim = RRect.fromRectAndRadius(simRect, Radius.circular(s(5)));
+
+    canvas.drawRRect(sim, p);
+
+    // notch: the classic cut corner, top-right
+    final notch = Path()
+      ..moveTo(sim.outerRect.right - s(9), sim.outerRect.top)
+      ..lineTo(sim.outerRect.right, sim.outerRect.top + s(9));
+    canvas.drawPath(notch, p);
+
+    // contact pads (2 x 4)
+    final pw = r * 0.16, ph = r * 0.13;
+    final gapX = r * 0.045, gapY = r * 0.05;
+    final gridW = pw * 4 + gapX * 3;
+    final left = c.dx - gridW / 2;
+    final top = c.dy + s(6);
+    for (int row = 0; row < 2; row++) {
+      for (int col = 0; col < 4; col++) {
+        canvas.drawRect(
+          Rect.fromLTWH(left + col * (pw + gapX), top + row * (ph + gapY), pw, ph),
+          p,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrandMarkPainter old) =>
+      old.color != color || old.stroke != stroke;
+}
+
 /// Soft rounded tag/pill (data, validity, badges).
 class SoftTag extends StatelessWidget {
   final String text;

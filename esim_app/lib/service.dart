@@ -39,6 +39,43 @@ class ApiService {
 
   /// Enabled payment channels as configured in the admin backend.
   /// Falls back to an empty list on error so the caller can use a default.
+  /// Capture a PayPal order after the buyer approved it in the browser.
+  ///
+  /// The backend is idempotent: calling capture twice returns already=True
+  /// rather than double-charging. Returns the settled order status.
+  Future<Map<String, dynamic>> paypalCapture(String orderNo) async {
+    final j = await _c.post("/api/payments/paypal/capture",
+        auth: true, body: {"order_no": orderNo});
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Public payment instructions for this deployment (manual mode text, QR, ...).
+  Future<Map<String, dynamic>> paymentInfo() async {
+    final j = await _c.get("/api/orders/payment-info", auth: false);
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Customer-initiated cancellation. Only allowed while the order is still
+  /// pending; the server rejects anything already paid.
+  Future<Order> cancelOrder(String orderNo) async {
+    final j = await _c.post("/api/orders/$orderNo/cancel", auth: true);
+    return Order.fromJson(j);
+  }
+
+  /// Single plan by id, for the detail screen.
+  Future<Plan> plan(int id) async =>
+      Plan.fromJson(await _c.get("/api/plans/$id", auth: false));
+
+  /// App update check. Returns the raw payload so the caller can decide what to
+  /// show: {version, build, url, notes, force}.
+  Future<Map<String, dynamic>> appVersion() async {
+    final j = await _c.get("/api/app/version", auth: false);
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Absolute URL of the newest APK, for a direct browser download.
+  String appDownloadUrl() => "/api/app/download";
+
   Future<List<PaymentGateway>> paymentGateways() async {
     final j = await _c.get("/api/payments");
     return (j as List).map((e) => PaymentGateway.fromJson(e as Map<String, dynamic>)).toList();
@@ -54,6 +91,7 @@ class ApiService {
     String shipPhone = "",
     String shipAddress = "",
     String notes = "",
+    bool useVoucher = false,
   }) async {
     final j = await _c.post("/api/orders/checkout", auth: true, body: {
       "items": items,
@@ -61,6 +99,7 @@ class ApiService {
       "payment_provider": paymentProvider,
       "currency": currency,
       "coupon_code": couponCode,
+      "use_voucher": useVoucher,
       "ship_name": shipName,
       "ship_phone": shipPhone,
       "ship_address": shipAddress,
@@ -76,9 +115,106 @@ class ApiService {
     return ((j["items"] ?? []) as List).map((e) => Order.fromJson(e)).toList();
   }
 
+  /// Live usage for one issued eSIM. The backend queries the upstream card API
+  /// by ICCID and returns both used and total MB, so the app can render a real
+  /// progress bar instead of guessing a budget from the plan title.
+  /// 当前用户已购买的卡，带实时流量。
+  /// 按 ICCID 查卡流量与状态。
+  Future<CardFlowInfo> cardFlow(String simId) async {
+    final j = await _c.get("/api/card/flow",
+        q: {"sim_id": simId}, auth: true);
+    return CardFlowInfo.fromJson((j as Map).cast<String, dynamic>());
+  }
+
+  /// 按卡号返回：当前套餐 + 可充值套餐。
+  Future<CardPackagesResult> cardPackagesByCard(String simId) async {
+    final j = await _c.get("/api/card/card-packages",
+        q: {"sim_id": simId}, auth: true);
+    return CardPackagesResult.fromJson((j as Map).cast<String, dynamic>());
+  }
+
+  /// 我的充值订单列表。
+  Future<List<RechargeOrder>> myRecharges() async {
+    final j = await _c.get("/api/recharge/orders", auth: true);
+    return (j as List)
+        .map((e) => RechargeOrder.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
+  /// 创建充值订单（待支付）。
+  Future<RechargeOrder> createRecharge({
+    required String simId,
+    required String mealId,
+    String mealName = "",
+    int days = 0,
+    String flowSizeMb = "",
+    required double amount,
+    String currency = "USD",
+    String provider = "manual",
+  }) async {
+    final j = await _c.post("/api/recharge/orders", auth: true, body: {
+      "sim_id": simId,
+      "meal_id": mealId,
+      "meal_name": mealName,
+      "days": days,
+      "flow_size_mb": flowSizeMb,
+      "amount": amount,
+      "currency": currency,
+      "payment_provider": provider,
+    });
+    return RechargeOrder.fromJson((j as Map).cast<String, dynamic>());
+  }
+
+  /// 付款并触发充值。返回是否成功。
+  Future<bool> payRecharge(String orderNo) async {
+    final j = await _c.post("/api/recharge/orders/$orderNo/pay",
+        auth: true, body: {"provider": "manual", "ref": ""});
+    final m = (j as Map).cast<String, dynamic>();
+    return m["status"] == "fulfilled";
+  }
+
+  /// 按 ICCID 查卡状态。
+  Future<CardFlowInfo> cardStatus(String simId) async {
+    final j = await _c.get("/api/card/status",
+        q: {"sim_id": simId}, auth: true);
+    return CardFlowInfo.fromJson((j as Map).cast<String, dynamic>());
+  }
+
+  /// 可充值的套餐列表。
+  Future<List<CardPackage>> cardPackages() async {
+    final j = await _c.get("/api/card/packages", auth: true);
+    final list = (j as Map)["packages"] as List? ?? [];
+    return list.map((e) => CardPackage.fromJson((e as Map).cast<String, dynamic>())).toList();
+  }
+
+  /// 给卡充值套餐。返回是否成功。
+  Future<bool> cardRecharge({required String simId, required String mealId}) async {
+    final j = await _c.post("/api/card/recharge",
+        auth: true,
+        body: {
+          "sim_id": simId,
+          "meal_id": mealId,
+          "count_num": 1,
+          "effect_type": "",
+          "confirm": true,
+        });
+    return (j as Map)["ok"] == true;
+  }
+
+  Future<List<MyEsim>> myEsims({bool refresh = true}) async {
+    final j = await _c.get("/api/orders/my-esims", q: {"refresh": refresh}, auth: true);
+    return (j as List).map((e) => MyEsim.fromJson((e as Map).cast<String, dynamic>())).toList();
+  }
+
+  Future<EsimUsage> usage(int esimId) async {
+    final j = await _c.get("/api/orders/esims/$esimId/usage");
+    return EsimUsage.fromJson((j as Map).cast<String, dynamic>());
+  }
+
+  /// Backwards-compatible shim for callers that still expect an Esim.
   Future<Esim> refreshUsage(int esimId) async {
     final j = await _c.get("/api/orders/esims/$esimId/usage");
-    return Esim.fromJson(j);
+    return Esim.fromJson((j as Map).cast<String, dynamic>());
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -121,10 +257,73 @@ class ApiService {
     return UserInfo.fromJson(j);
   }
 
-  Future<UserInfo> register(String email, String password, String name) async {
-    final j = await _c.post("/api/auth/register",
-        auth: false, body: {"email": email, "password": password, "full_name": name});
+  Future<UserInfo> register(
+    String email,
+    String password,
+    String name, {
+    String code = "",
+  }) async {
+    final j = await _c.post("/api/auth/register", auth: false, body: {
+      "email": email,
+      "password": password,
+      "full_name": name,
+      "code": code,
+    });
     return UserInfo.fromJson(j);
+  }
+
+  /// Ask the backend to email a one-time code.
+  ///
+  /// [purpose] is "register" or "reset". Throws on rate limiting so the UI can
+  /// show the server's own wording (it already includes the wait time).
+  Future<int> sendCode(String email, {String purpose = "register"}) async {
+    final j = await _c.post("/api/auth/send-code", auth: false, body: {
+      "email": email,
+      "purpose": purpose,
+    });
+    final m = (j as Map).cast<String, dynamic>();
+    return (m["ttl_minutes"] as num?)?.toInt() ?? 10;
+  }
+
+  /// Reset a password with a code issued for purpose="reset".
+  Future<void> resetPassword(String email, String code, String password) async {
+    await _c.post("/api/auth/reset-password", auth: false, body: {
+      "email": email,
+      "code": code,
+      "password": password,
+    });
+  }
+
+  /// Invite-a-friend: my code, the 10% discount and my stats.
+  Future<Map<String, dynamic>> referralMe() async {
+    final j = await _c.get("/api/referral/me", auth: true);
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Friends I invited, with their status.
+  Future<Map<String, dynamic>> referralList() async {
+    final j = await _c.get("/api/referral/list", auth: true);
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Bind the signed-in account to an inviter's code.
+  Future<Map<String, dynamic>> referralClaim(String code) async {
+    final j = await _c.post("/api/referral/claim", auth: true, body: {"code": code});
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// My cash voucher balance (CNY).
+  Future<Map<String, dynamic>> myVoucher() async {
+    final j = await _c.get("/api/referral/voucher", auth: true);
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Change the password of the signed-in account.
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    await _c.post("/api/auth/change-password", auth: true, body: {
+      "current_password": currentPassword,
+      "password": newPassword,
+    });
   }
 
   // ---------------- support chat ----------------

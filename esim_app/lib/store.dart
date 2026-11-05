@@ -154,15 +154,18 @@ class AppState extends ChangeNotifier {
   double usedDataGb = 0;
   bool statsLoading = false;
 
-  /// Recompute the account-page eSIM stats from the user's orders.
-  /// One order can contain several eSIMs; data budget is inferred per plan
-  /// (the backend doesn't send plan GB on the esim row), usage comes from the
-  /// live `data_used_mb` on each issued profile.
+  /// Recompute the account-page eSIM stats.
+  ///
+  /// Traffic now comes from the upstream card API (by ICCID) through
+  /// `/api/orders/esims/{id}/usage`, which returns both used and total MB.
+  /// The plan-title heuristic is only used as a fallback when the upstream
+  /// has no quota data for a profile.
   Future<void> refreshEsimStats() async {
     if (!isLoggedIn) {
       activeEsimCount = 0;
       totalDataGb = 0;
       usedDataGb = 0;
+      esimUsages.clear();
       statsLoading = false;
       notifyListeners();
       return;
@@ -170,22 +173,55 @@ class AppState extends ChangeNotifier {
     statsLoading = true;
     notifyListeners();
     try {
-      final orders = await api.myOrders();
-      var count = 0;
-      var totalGb = 0.0;
-      var usedMb = 0.0;
-      for (final o in orders) {
-        if (o.status == 'cancelled' || o.status == 'refunded') continue;
-        final orderGb = _orderBudgetGb(o);
-        for (final e in o.esims) {
-          if (e.status == 'expired') continue;
-          count += 1;
-          totalGb += orderGb;
-          usedMb += e.dataUsedMb;
+      // my-esims is the single source of truth: it returns issued eSIM profiles
+      // AND physical cards bound to this customer. Counting from myOrders()
+      // alone missed bound cards entirely, which is why "活跃套餐" stayed 0
+      // for a customer who only had a card.
+      final items = await api.myEsims(refresh: false);
+
+      // 有卡但还没流量数据时，再拉一次带上游刷新的。实体卡刚绑定的时候
+      // 库里是 0/0，不刷的话「我的」页只显示活跃套餐、总流量和已用都是 0。
+      // 只在缺失时才付出这次开销，正常的列表不重复请求。
+      List<MyEsim> source = items;
+      if (items.any((e) => e.status != 'expired' && e.dataTotalMb <= 0)) {
+        try {
+          source = await api.myEsims();
+        } catch (_) {
+          source = items;
         }
       }
+
+      var count = 0;
+      var totalMb = 0.0;
+      var usedMb = 0.0;
+      final usages = <int, EsimUsage>{};
+
+      for (final e in source) {
+        if (e.status == 'expired') continue;
+        count += 1;
+
+        double total = e.dataTotalMb;
+        double used = e.dataUsedMb;
+        if (total <= 0) {
+          // Upstream has no quota for this profile (common for freshly bound
+          // cards): fall back to the GB figure in the plan title.
+          total = _titleGbs(e.planTitle) * 1024;
+        }
+        usages[e.id] = EsimUsage(
+          id: e.id,
+          status: e.status,
+          usedMb: used,
+          totalMb: total,
+        );
+        totalMb += total;
+        usedMb += used;
+      }
+
+      esimUsages
+        ..clear()
+        ..addAll(usages);
       activeEsimCount = count;
-      totalDataGb = totalGb;
+      totalDataGb = totalMb / 1024.0;
       usedDataGb = usedMb / 1024.0;
     } catch (_) {
       // keep previous values on failure
@@ -195,14 +231,19 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Per-eSIM live usage, keyed by esim id. Filled by [refreshEsimStats].
+  final Map<int, EsimUsage> esimUsages = {};
+
+  EsimUsage? usageOf(int esimId) => esimUsages[esimId];
   /// Pull a GB figure out of an item title like "Japan eSIM 20GB 30 Days".
-  double _orderBudgetGb(Order o) {
-    for (final it in o.items) {
-      final m = RegExp(r'(\d+(?:\.\d+)?)\s*GB', caseSensitive: false).firstMatch(it.title);
-      if (m != null) {
-        final v = double.tryParse(m.group(1)!);
-        if (v != null) return v;
-      }
+  /// Pull the GB figure out of a plan title ("Japan 2GB 1 Day eSIM" -> 2).
+  /// Used as a quota fallback when upstream reports no total for a profile,
+  /// which is normal for a freshly bound card.
+  double _titleGbs(String title) {
+    if (title.isEmpty) return 0;
+    final m = RegExp(r'(\d+(?:\.\d+)?)\s*GB', caseSensitive: false).firstMatch(title);
+    if (m != null) {
+      return double.tryParse(m.group(1)!) ?? 0;
     }
     return 0;
   }
@@ -229,10 +270,23 @@ class AppState extends ChangeNotifier {
     return user!;
   }
 
-  Future<UserInfo> register(String email, String password, String name) async {
-    await api.register(email, password, name);
+  Future<UserInfo> register(
+    String email,
+    String password,
+    String name, {
+    String code = '',
+  }) async {
+    await api.register(email, password, name, code: code);
     return login(email, password);
   }
+
+  /// Request an email verification code. Returns the code's lifetime in minutes.
+  Future<int> sendCode(String email, {String purpose = 'register'}) =>
+      api.sendCode(email, purpose: purpose);
+
+  /// Complete a password reset using a code issued for purpose='reset'.
+  Future<void> resetPassword(String email, String code, String password) =>
+      api.resetPassword(email, code, password);
 
   Future<void> logout() async {
     _token = null;

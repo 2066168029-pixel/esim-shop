@@ -1,83 +1,149 @@
 import 'package:flutter/material.dart';
 
-/// Onlylink-style palette: iOS blue, light-blue gradient backgrounds, white cards.
+/// OnlyLink 设计系统 v2
+///
+/// 方向：冷调中性底 + 单一强调色，卡片靠留白和细边框分层，
+/// 不用重投影。数字统一等宽，形成「信息密度高但不拥挤」的观感。
 class AppColors {
-  static const primary = Color(0xFF0A66FF); // iOS-ish blue used across the app
-  static const primaryDark = Color(0xFF0052CC);
-  static const primaryLight = Color(0xFF3B8CFF);
-  static const sky = Color(0xFFE6F2FF); // top gradient
-  static const skyDeep = Color(0xFFCFE6FF);
-  static const bg = Color(0xFFF5F8FC);
-  static const card = Colors.white;
-  static const text = Color(0xFF0B1220);
-  static const textSub = Color(0xFF6B7280);
-  static const muted = Color(0xFF9AA4B2);
-  static const border = Color(0xFFE8EDF4);
-  static const success = Color(0xFF22C55E);
-  static const orange = Color(0xFFF97316);
-  static const warn = Color(0xFFF59E0B);
-  static const danger = Color(0xFFEF4444);
-  static const gold = Color(0xFFF5B301);
+  // ---- 强调色（靛蓝，比原来的纯蓝更沉稳）----
+  static const primary = Color(0xFF4F46E5);
+  static const primaryDark = Color(0xFF3730A3);
+  static const primaryLight = Color(0xFF818CF8);
+  static const primaryWash = Color(0xFFEEF0FF);
 
-  /// Blue used for the active-eSIM hero card.
+  // ---- 表面 ----
+  static const bg = Color(0xFFF6F7FB);
+  static const surface = Colors.white;
+  static const surface2 = Color(0xFFFAFBFD);
+  static const sky = Color(0xFFEEF2FF);
+  static const skyDeep = Color(0xFFE0E7FF);
+
+  // ---- 文字 ----
+  static const text = Color(0xFF0F172A);
+  static const textSub = Color(0xFF5A6478);
+  static const muted = Color(0xFF8B94A6);
+
+  // ---- 线 ----
+  static const border = Color(0xFFE6EAF2);
+  static const borderSoft = Color(0xFFF0F3F8);
+
+  // ---- 状态 ----
+  static const success = Color(0xFF059669);
+  static const successWash = Color(0xFFECFDF5);
+  static const warn = Color(0xFFB45309);
+  static const warnWash = Color(0xFFFFFBEB);
+  static const orange = Color(0xFFEA580C);
+  static const danger = Color(0xFFDC2626);
+  static const dangerWash = Color(0xFFFEF2F2);
+  static const gold = Color(0xFFD97706);
+
+  // ---- 渐变 ----
+  /// 主视觉卡（余额 / 卡状态）
   static const heroBlue = LinearGradient(
-    colors: [Color(0xFF0A66FF), Color(0xFF3B8CFF)],
+    colors: [Color(0xFF4F46E5), Color(0xFF6366F1), Color(0xFF818CF8)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
+    stops: [0.0, 0.55, 1.0],
   );
 
-  /// Deep navy used for the QR activation card.
+  /// 深色卡片（激活码 / QR）
   static const navyCard = LinearGradient(
-    colors: [Color(0xFF0A2A66), Color(0xFF0A66FF)],
+    colors: [Color(0xFF111C33), Color(0xFF1E2A4A)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
+  /// 页面背景（顶部轻微渐变）
   static const skyBackground = LinearGradient(
-    colors: [Color(0xFFE6F2FF), Color(0xFFFFFFFF)],
+    colors: [Color(0xFFEEF2FF), Color(0xFFF6F7FB)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    stops: [0.0, 0.45],
+    stops: [0.0, 0.32],
+  );
+
+  /// 骨架 / 占位
+  static const skeleton = LinearGradient(
+    colors: [Color(0xFFF1F4F9), Color(0xFFE8EDF5), Color(0xFFF1F4F9)],
+    begin: Alignment(-1, 0),
+    end: Alignment(1, 0),
   );
 }
 
 class AppRadii {
-  static const card = 18.0;
-  static const big = 22.0;
-  static const btn = 14.0;
+  static const sm = 8.0;
+  static const card = 16.0;
+  static const big = 20.0;
+  static const btn = 12.0;
+  static const pill = 999.0;
+}
+
+class AppShadow {
+  static const card = [
+    BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 2)),
+  ];
+  static const lift = [
+    BoxShadow(color: Color(0x0F0F172A), blurRadius: 22, offset: Offset(0, 8)),
+  ];
+  static const hero = [
+    BoxShadow(color: Color(0x334F46E5), blurRadius: 26, offset: Offset(0, 12)),
+  ];
 }
 
 ThemeData buildTheme() {
   final base = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: Brightness.light),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: Brightness.light,
+      surface: AppColors.surface,
+    ),
     scaffoldBackgroundColor: AppColors.bg,
+    splashFactory: InkSparkle.splashFactory,
   );
+
   return base.copyWith(
+    textTheme: base.textTheme.apply(
+      bodyColor: AppColors.text,
+      displayColor: AppColors.text,
+      fontFamily: null,
+    ),
+
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       foregroundColor: AppColors.text,
       elevation: 0,
+      scrolledUnderElevation: 0,
       centerTitle: true,
-      titleTextStyle: TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+        color: AppColors.text,
+        fontSize: 16.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -.2,
+      ),
     ),
+
     cardTheme: CardThemeData(
-      color: AppColors.card,
+      color: AppColors.surface,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
       margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: const BorderSide(color: AppColors.border, width: 1),
+      ),
     ),
+
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        minimumSize: const Size.fromHeight(52),
+        minimumSize: const Size.fromHeight(50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.btn)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, letterSpacing: -.1),
       ),
     ),
+
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.primary,
@@ -87,30 +153,87 @@ ThemeData buildTheme() {
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
+
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+    ),
+
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-      hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+      hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14, fontWeight: FontWeight.w400),
+      prefixIconColor: AppColors.muted,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.danger),
+      ),
     ),
+
+    // 底部导航交给自定义实现，这里只兜底
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: AppColors.primary,
       unselectedItemColor: AppColors.muted,
       type: BottomNavigationBarType.fixed,
       showUnselectedLabels: true,
-      selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      unselectedLabelStyle: TextStyle(fontSize: 11),
-      elevation: 10,
+      elevation: 0,
     ),
-    dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1, space: 1),
+
+    dividerTheme: const DividerThemeData(
+      color: AppColors.borderSoft, thickness: 1, space: 1,
+    ),
+
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.text,
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    ),
+
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.big)),
+      titleTextStyle: const TextStyle(
+        color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -.2,
+      ),
+    ),
+
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+    ),
+
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: AppColors.surface2,
+      side: const BorderSide(color: AppColors.border),
+      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSub),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
+    ),
   );
 }
 
-/// Status label + color.
+/// 状态标签 + 颜色（保持向后兼容）
 (Color, String) statusStyle(String status) {
   switch (status) {
     case "fulfilled":

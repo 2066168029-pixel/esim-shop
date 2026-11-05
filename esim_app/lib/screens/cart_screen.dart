@@ -1,3 +1,4 @@
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -37,39 +38,73 @@ class CartScreen extends StatelessWidget {
   Widget _line(BuildContext context, CartLine line, AppState app) {
     final p = line.plan;
     final c = countryOf(p.countryCode);
-    return AppCard(
-      padding: const EdgeInsets.all(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadow.card,
+      ),
+      padding: const EdgeInsets.all(11),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(destinationPhoto(p.countryCode, cover: p.cover), width: 56, height: 56, fit: BoxFit.cover,
-                errorBuilder: (_, e, s) => Container(width: 56, height: 56, color: AppColors.skyDeep)),
+            borderRadius: BorderRadius.circular(11),
+            child: Image.network(
+              destinationPhoto(p.countryCode, cover: p.cover),
+              width: 62, height: 62, fit: BoxFit.cover,
+              errorBuilder: (_, e, s) => Container(
+                width: 62, height: 62,
+                decoration: const BoxDecoration(gradient: AppColors.heroBlue),
+                child: const Icon(Icons.public_rounded, color: Colors.white38, size: 24),
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(p.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('${c.nameZh} · ${p.dataGb > 0 ? '${p.dataGb}GB' : '语音'} · ${p.validityDays}天',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSub)),
-                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(p.title,
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, height: 1.35),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    InkWell(
+                      onTap: () => context.read<AppState>().removeLine(p.id),
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(Icons.close_rounded, size: 16, color: AppColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${c.nameZh} · ${p.dataGb > 0 ? '${p.dataGb}GB' : '语音'} · ${p.validityDays}天',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
+                ),
+                const SizedBox(height: 9),
                 Row(
                   children: [
-                    PriceAccent(p.price, size: 16),
+                    Text(app.price(p.price * line.quantity),
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.3,
+                            fontFeatures: [FontFeature.tabularFigures()])),
                     const Spacer(),
                     _stepper(context, line),
                   ],
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18, color: AppColors.muted),
-            onPressed: () => context.read<AppState>().removeLine(p.id),
           ),
         ],
       ),
@@ -78,42 +113,92 @@ class CartScreen extends StatelessWidget {
 
   Widget _stepper(BuildContext context, CartLine line) {
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFFF0F4FA), borderRadius: BorderRadius.circular(10)),
+      height: 30,
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Row(children: [
-        _stepBtn(Icons.remove, () => context.read<AppState>().setQty(line.plan.id, line.quantity - 1)),
-        SizedBox(width: 26, child: Text('${line.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
-        _stepBtn(Icons.add, () => context.read<AppState>().setQty(line.plan.id, line.quantity + 1)),
+        _stepBtn(Icons.remove_rounded,
+            line.quantity <= 1 ? null : () => context.read<AppState>().setQty(line.plan.id, line.quantity - 1)),
+        SizedBox(
+          width: 24,
+          child: Text('${line.quantity}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontFeatures: [FontFeature.tabularFigures()])),
+        ),
+        _stepBtn(Icons.add_rounded,
+            line.quantity >= 20 ? null : () => context.read<AppState>().setQty(line.plan.id, line.quantity + 1)),
       ]),
     );
   }
 
-  Widget _stepBtn(IconData icon, VoidCallback onTap) => InkWell(
+  Widget _stepBtn(IconData icon, VoidCallback? onTap) => InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 16, color: AppColors.text)),
+        borderRadius: BorderRadius.circular(9),
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Icon(icon,
+              size: 15,
+              color: onTap == null ? AppColors.border : AppColors.textSub),
+        ),
       );
 
   Widget _bar(BuildContext context, AppState app) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
+      padding: EdgeInsets.fromLTRB(18, 14, 18, 14 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        boxShadow: [BoxShadow(color: Color(0x141E3A8A), blurRadius: 20, offset: Offset(0, -4))],
+        border: const Border(top: BorderSide(color: AppColors.borderSoft)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: .06),
+            blurRadius: 22, offset: const Offset(0, -6),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [Text('合计', style: TextStyle(fontSize: 12, color: AppColors.textSub)), SizedBox(height: 2)],
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('合计 · ${app.cartCount} 件',
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+              const SizedBox(height: 3),
+              Text(app.price(app.cartTotal),
+                  style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.6,
+                      height: 1.0,
+                      fontFeatures: [FontFeature.tabularFigures()])),
+            ],
           ),
-          PriceText(app.cartTotal),
           const Spacer(),
           SizedBox(
-            width: 168,
+            width: 158,
+            height: 46,
             child: ElevatedButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen())),
-              child: Text('去结算 (${app.cartCount})'),
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(0, 46),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('去结算', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 3),
+                  const Icon(Icons.arrow_forward_rounded, size: 17),
+                ],
+              ),
             ),
           ),
         ],

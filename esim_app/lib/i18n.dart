@@ -1,4 +1,4 @@
-/// Supported app languages.
+﻿/// Supported app languages.
 enum AppLang { en, zh, ja, ko, th, vi }
 
 extension AppLangInfo on AppLang {
@@ -86,6 +86,26 @@ class L {
   String get totalData => _t({AppLang.en: 'Total Data', AppLang.zh: '总流量', AppLang.ja: '総データ', AppLang.ko: '총 데이터', AppLang.th: 'ข้อมูลทั้งหมด', AppLang.vi: 'Tổng dung lượng'});
   String get dataUsed => _t({AppLang.en: 'Used', AppLang.zh: '已使用', AppLang.ja: '使用済み', AppLang.ko: '사용량', AppLang.th: 'ใช้ไป', AppLang.vi: 'Đã dùng'});
   String get payment => _t({AppLang.en: 'Payment Methods', AppLang.zh: '支付方式', AppLang.ja: '支払い方法', AppLang.ko: '결제 수단', AppLang.th: 'วิธีชำระเงิน', AppLang.vi: 'Thanh toán'});
+  // refer a friend
+  String get inviteFriends => _t({AppLang.en: 'Invite Friends', AppLang.zh: '邀请好友', AppLang.ja: '友達を招待', AppLang.ko: '?? ??', AppLang.th: 'ชวนเพื่อน', AppLang.vi: 'M?i b?n b?'});
+  String get inviteSubtitle => _t({AppLang.en: 'Friends get 5% off their first order', AppLang.zh: '好友下单立享 5% 优惠', AppLang.ja: '???????? 5% ????', AppLang.ko: '?? ?? ?? 5% ??', AppLang.th: '???????? 5% ???????????', AppLang.vi: 'B?n b? gi?m 5% ??n ??u ti?n'});
+  String get cashVoucher => _t({AppLang.en: 'Cash voucher', AppLang.zh: '现金券', AppLang.ja: '現金クーポン', AppLang.ko: '?? ??', AppLang.th: 'คูปองเงินสด', AppLang.vi: 'Phi?u ti?n m?t'});
+  String get voucherBalance => _t({AppLang.en: 'Balance', AppLang.zh: '余额', AppLang.ja: '残高', AppLang.ko: '잔액', AppLang.th: 'ยอดเงิน', AppLang.vi: 'S? d?'});
+  String get voucherNote => _t({AppLang.en: 'Earn 5% of your friend\'s first order, paid in CNY', AppLang.zh: '好友首单实付金额的 5%，以人民币发放', AppLang.ja: '??? ???? 5%?? CNY????????', AppLang.ko: '?? ?? ?? 5%, CNY ???', AppLang.th: '??? 5% ?????? CNY', AppLang.vi: 'Nh?n 5% ??n h?ng ??u c?a b?n b?, b?ng CNY'});
+  String get useVoucher => _t({AppLang.en: 'Use cash voucher', AppLang.zh: '使用现金券抵扣', AppLang.ja: '使用する', AppLang.ko: '?? ?? ??', AppLang.th: 'ใช้คูปอง', AppLang.vi: 'D?ng phi?u gi?m gi?'});
+
+  String get inviteCodeOptional => _t({AppLang.en: 'Invite code (optional)', AppLang.zh: '邀请码（选填）', AppLang.ja: '???ID?????', AppLang.ko: '?? ??(??)', AppLang.th: '?????????(?????)', AppLang.vi: 'M? m?i (kh?ng b?t bu?c)'});
+  String get inviteCodeHint => _t({AppLang.en: 'Enter it to get 5% off your first order', AppLang.zh: '塭写可享首单 5% 优惠', AppLang.ja: '??????? 5% ????', AppLang.ko: '?? ?? 5% ??', AppLang.th: '?????? 5% ???????', AppLang.vi: 'Nh?p ?? ???c gi?m 5% ??n ??u'});
+  String get inviteApplied => _t({AppLang.en: 'Invite code applied', AppLang.zh: '邀请码已生效', AppLang.ja: '?????ID????', AppLang.ko: '?? ??? ?????', AppLang.th: 'ใช้รหัสเชิญแล้ว', AppLang.vi: '?? ?p d?ng m? m?i'});
+
+  String get myInviteCode => _t({AppLang.en: 'My invite code', AppLang.zh: '我的邀请码', AppLang.ja: '?????ID', AppLang.ko: '?? ?? ??', AppLang.th: 'รหัสเชิญของฉัน', AppLang.vi: 'M? m?i c?a t?i'});
+  String get copyInviteCode => _t({AppLang.en: 'Copy code', AppLang.zh: '复制邀请码', AppLang.ja: 'ID ????', AppLang.ko: '?? ??', AppLang.th: 'คัดลอกรหัสเชิญ', AppLang.vi: 'Sao ch?p m?'});
+  String get saved => _t({AppLang.en: 'Saved to album', AppLang.zh: '已保存到相册', AppLang.ja: '保存しました', AppLang.ko: '??? ?????', AppLang.th: 'บันทึกแล้ว', AppLang.vi: '?? l?u v?o th? vi?n'});
+  String get invitedFriends => _t({AppLang.en: 'Invited', AppLang.zh: '已邀请', AppLang.ja: '招待人数', AppLang.ko: '?? ??', AppLang.th: 'จำนวนที่เชิญ', AppLang.vi: '?? m?i'});
+  String get qualifiedFriends => _t({AppLang.en: 'Rewarded', AppLang.zh: '已达标', AppLang.ja: '成立人数', AppLang.ko: '?? ??', AppLang.th: 'ที่สำเร็จ', AppLang.vi: '?? ??t'});
+  String get savePoster => _t({AppLang.en: 'Save poster', AppLang.zh: '保存海报', AppLang.ja: 'ポスターを保存', AppLang.ko: '??? ??', AppLang.th: 'บันทึกโปสเตอร์', AppLang.vi: 'L?u poster'});
+  String get sharePoster => _t({AppLang.en: 'Share poster', AppLang.zh: '分享海报', AppLang.ja: 'ポスターを共有', AppLang.ko: '??? ??', AppLang.th: 'แชร์โปสเตอร์', AppLang.vi: 'Chia s? poster'});
+
   String get qrCode => _t({AppLang.en: 'QR Code', AppLang.zh: '二维码', AppLang.ja: 'QR コード', AppLang.ko: 'QR 코드', AppLang.th: 'คิวอาร์โค้ด', AppLang.vi: 'Mã QR'});
   String get language => _t({AppLang.en: 'Language', AppLang.zh: '语言', AppLang.ja: '言語', AppLang.ko: '언어', AppLang.th: 'ภาษา', AppLang.vi: 'Ngôn ngữ'});
   String get currency => _t({AppLang.en: 'Currency', AppLang.zh: '币种', AppLang.ja: '通貨', AppLang.ko: '통화', AppLang.th: 'สกุลเงิน', AppLang.vi: 'Tiền tệ'});
@@ -95,6 +115,7 @@ class L {
   String get privacy => _t({AppLang.en: 'Privacy Policy', AppLang.zh: '隐私政策', AppLang.ja: 'プライバシー', AppLang.ko: '개인정보', AppLang.th: 'ความเป็นส่วนตัว', AppLang.vi: 'Quyền riêng tư'});
   String get notifications => _t({AppLang.en: 'Notification', AppLang.zh: '通知设置', AppLang.ja: '通知', AppLang.ko: '알림', AppLang.th: 'การแจ้งเตือน', AppLang.vi: 'Thông báo'});
   String get logOut => _t({AppLang.en: 'Log Out', AppLang.zh: '退出登录', AppLang.ja: 'ログアウト', AppLang.ko: '로그아웃', AppLang.th: 'ออกจากระบบ', AppLang.vi: 'Đăng xuất'});
+  String get changePassword => _t({AppLang.en: 'Change password', AppLang.zh: '修改密码', AppLang.ja: 'パスワード変更', AppLang.ko: '비밀번호 변경', AppLang.th: 'เปลี่ยนรหัสผ่าน', AppLang.vi: 'Đổi mật khẩu'});
   String get logIn => _t({AppLang.en: 'Sign In', AppLang.zh: '登录', AppLang.ja: 'ログイン', AppLang.ko: '로그인', AppLang.th: 'เข้าสู่ระบบ', AppLang.vi: 'Đăng nhập'});
   String get member => _t({AppLang.en: 'Member', AppLang.zh: '会员', AppLang.ja: 'メンバー', AppLang.ko: '멤버', AppLang.th: 'สมาชิก', AppLang.vi: 'Thành viên'});
   String get memberBadge => _t({AppLang.en: 'Onlylink Member', AppLang.zh: 'Onlylink 会员', AppLang.ja: 'Onlylink メンバー', AppLang.ko: 'Onlylink 멤버', AppLang.th: 'สมาชิก Onlylink', AppLang.vi: 'Thành viên Onlylink'});
@@ -127,10 +148,10 @@ class L {
   String get cwConnecting => _t({AppLang.en: 'Connecting…', AppLang.zh: '连接中…', AppLang.ja: '接続中…', AppLang.ko: '연결 중…', AppLang.th: 'กำลังเชื่อมต่อ…', AppLang.vi: 'Đang kết nối…'});
   String get cwConnected => _t({AppLang.en: 'Connected', AppLang.zh: '已连接', AppLang.ja: '接続済み', AppLang.ko: '연결됨', AppLang.th: 'เชื่อมต่อแล้ว', AppLang.vi: 'Đã kết nối'});
   String get cwDisconnect => _t({AppLang.en: 'Disconnect', AppLang.zh: '断开', AppLang.ja: '切断', AppLang.ko: '연결 해제', AppLang.th: 'ตัดการเชื่อมต่อ', AppLang.vi: 'Ngắt kết nối'});
-  String get cwCardPassword => _t({AppLang.en: 'Card password', AppLang.zh: '卡密码', AppLang.ja: 'カードパスワード', AppLang.ko: '카드 비밀번호', AppLang.th: 'รหัสผ่านการ์ด', AppLang.vi: 'Mật khẩu thẻ'});
-  String get cwEnterPassword => _t({AppLang.en: 'Enter card password', AppLang.zh: '输入卡密码', AppLang.ja: 'カードパスワードを入力', AppLang.ko: '카드 비밀번호 입력', AppLang.th: 'ใส่รหัสผ่านการ์ด', AppLang.vi: 'Nhập mật khẩu thẻ'});
-  String get cwPasswordRequired => _t({AppLang.en: 'Required', AppLang.zh: '必填', AppLang.ja: '必須', AppLang.ko: '필수', AppLang.th: 'จำเป็น', AppLang.vi: 'Bắt buộc'});
-  String get cwPasswordNote => _t({AppLang.en: 'This is not the Bluetooth PIN. It is set by the card or reader vendor and is needed to open the secure channel.', AppLang.zh: '注意：这不是蓝牙配对 PIN。密码由读卡器/卡的生产方设置，输入正确后才能读写。', AppLang.ja: 'これはBluetoothのPINではありません。カードまたはリーダーのベンダーが設定したもので、安全な通信路の確立に必要です。', AppLang.ko: '블루투스 PIN이 아닙니다. 카드 또는 리더 제조사가 설정한 비밀번호로, 보안 채널을 여는 데 필요합니다.', AppLang.th: 'นี่ไม่ใช่ PIN บลูทูธ แต่เป็นรหัสที่ผู้ผลิตการ์ดหรือเครื่องอ่านตั้งไว้ ใช้เปิดช่องทางที่ปลอดภัย', AppLang.vi: 'Đây không phải mã PIN Bluetooth. Đây là mật khẩu do nhà sản xuất thẻ hoặc đầu đọc đặt, cần để mở kênh bảo mật.'});
+  String get cwCardPassword => _t({AppLang.en: 'Password', AppLang.zh: 'Password', AppLang.ja: 'Password', AppLang.ko: 'Password', AppLang.th: 'Password', AppLang.vi: 'Password'});
+  String get cwEnterPassword => _t({AppLang.en: 'Card password', AppLang.zh: '卡密码', AppLang.ja: 'カードパスワード', AppLang.ko: '카드 비밀번호', AppLang.th: 'รหัสผ่านบัตร', AppLang.vi: 'Mật khẩu thẻ'});
+  String get cwPasswordRequired => _t({AppLang.en: 'On the card', AppLang.zh: '卡上印的密码', AppLang.ja: 'カード記載の番号', AppLang.ko: '카드에 적힌 번호', AppLang.th: 'ที่พิมพ์บนบัตร', AppLang.vi: 'In trên thẻ'});
+  String get cwPasswordNote => _t({AppLang.en: 'Please enter the Password on the card to write.', AppLang.zh: '注意：请输入卡上的 Password 进行写卡操作', AppLang.ja: 'カードに記載のパスワードを入力して書き込みます。', AppLang.ko: '카드에 적힌 Password 를 입력하여 카드 쓰기를 진행하세요.', AppLang.th: 'กรุณากรอก Password บนบัตรเพื่อดำเนินการเขียนบัตร', AppLang.vi: 'Vui lòng nhập Password trên thẻ để ghi thẻ.'});
   String get cwPasswordSaved => _t({AppLang.en: 'Using saved card password', AppLang.zh: '使用已保存的卡密码', AppLang.ja: '保存済みのパスワードを使用', AppLang.ko: '저장된 카드 비밀번호 사용', AppLang.th: 'ใช้รหัสผ่านที่บันทึกไว้', AppLang.vi: 'Dùng mật khẩu đã lưu'});
   String get cwEid => _t({AppLang.en: 'EID', AppLang.zh: 'EID', AppLang.ja: 'EID', AppLang.ko: 'EID', AppLang.th: 'EID', AppLang.vi: 'EID'});
   String get cwProfileCount => _t({AppLang.en: 'Cards', AppLang.zh: '卡号数量', AppLang.ja: 'カード数', AppLang.ko: '카드 수', AppLang.th: 'จำนวนการ์ด', AppLang.vi: 'Số thẻ'});
@@ -258,4 +279,71 @@ class L {
         return s;
     }
   }
+
+
+  // ---- card info page ----
+  String get cardDetails => _t({AppLang.en: 'Card Details', AppLang.zh: '卡片详情', AppLang.ja: 'カード詳細', AppLang.ko: '카드 세부정보', AppLang.th: 'รายละเอียดบัตร', AppLang.vi: 'Chi tiết thẻ'});
+  String get cardStatus => _t({AppLang.en: 'Card Status', AppLang.zh: '卡状态', AppLang.ja: 'カード状態', AppLang.ko: '카드 상태', AppLang.th: 'สถานะบัตร', AppLang.vi: 'Trạng thái thẻ'});
+  String get statusActive => _t({AppLang.en: 'Active', AppLang.zh: '已激活', AppLang.ja: '有効', AppLang.ko: '활성', AppLang.th: 'ใช้งานได้', AppLang.vi: 'Đã kích hoạt'});
+  String get statusPending => _t({AppLang.en: 'Not activated', AppLang.zh: '待激活', AppLang.ja: '未アクティベート', AppLang.ko: '활성화 대기', AppLang.th: 'รอเปิดใช้งาน', AppLang.vi: 'Chưa kích hoạt'});
+  String get statusSuspended => _t({AppLang.en: 'Suspended', AppLang.zh: '停机', AppLang.ja: '停止中', AppLang.ko: '정지', AppLang.th: 'ระงับ', AppLang.vi: 'Tạm dừng'});
+  String get statusCancelled => _t({AppLang.en: 'Cancelled', AppLang.zh: '已注销', AppLang.ja: '解約済み', AppLang.ko: '해지됨', AppLang.th: 'ยกเลิกแล้ว', AppLang.vi: 'Đã hủy'});
+  String get statusExpired => _t({AppLang.en: 'Expired', AppLang.zh: '已过期', AppLang.ja: '期限切れ', AppLang.ko: '만료됨', AppLang.th: 'หมดอายุ', AppLang.vi: 'Đã hết hạn'});
+  String get statusUnknown => _t({AppLang.en: 'Unknown', AppLang.zh: '未知', AppLang.ja: '不明', AppLang.ko: '알 수 없음', AppLang.th: 'ไม่ทราบ', AppLang.vi: 'Không rõ'});
+  String get remaining => _t({AppLang.en: 'Remaining', AppLang.zh: '剩余', AppLang.ja: '残り', AppLang.ko: '남은 양', AppLang.th: 'คงเหลือ', AppLang.vi: 'Còn lại'});
+  String get currentPlan => _t({AppLang.en: 'Current plan', AppLang.zh: '当前套餐', AppLang.ja: '現在のプラン', AppLang.ko: '현재 요금제', AppLang.th: 'แพ็กเกจปัจจุบัน', AppLang.vi: 'Gói hiện tại'});
+  String get rechargePlans => _t({AppLang.en: 'Recharge plans', AppLang.zh: '可充值套餐', AppLang.ja: 'チャージ可能なプラン', AppLang.ko: '충전 가능 요금제', AppLang.th: 'แพ็กเกจเติมเงิน', AppLang.vi: 'Gói nạp thêm'});
+  String get addOns => _t({AppLang.en: 'Add-ons', AppLang.zh: '叠加包', AppLang.ja: 'アドオン', AppLang.ko: '추가 패키지', AppLang.th: 'แพ็กเกจเสริม', AppLang.vi: 'Gói bổ trợ'});
+  String get noPackages => _t({AppLang.en: 'No plans available', AppLang.zh: '暂无套餐', AppLang.ja: 'プランがありません', AppLang.ko: '사용 가능한 요금제 없음', AppLang.th: 'ไม่มีแพ็กเกจ', AppLang.vi: 'Không có gói nào'});
+  String get loadPackages => _t({AppLang.en: 'Load plans', AppLang.zh: '加载套餐', AppLang.ja: 'プランを読み込む', AppLang.ko: '요금제 불러오기', AppLang.th: 'โหลดแพ็กเกจ', AppLang.vi: 'Tải gói'});
+  String get flow => _t({AppLang.en: 'Data', AppLang.zh: '流量', AppLang.ja: 'データ量', AppLang.ko: '데이터', AppLang.th: 'ข้อมูล', AppLang.vi: 'Dữ liệu'});
+  String get price => _t({AppLang.en: 'Price', AppLang.zh: '价格', AppLang.ja: '料金', AppLang.ko: '가격', AppLang.th: 'ราคา', AppLang.vi: 'Giá'});
+  String get expiresAt => _t({AppLang.en: 'Expires', AppLang.zh: '到期', AppLang.ja: '有効期限', AppLang.ko: '만료', AppLang.th: 'หมดอายุ', AppLang.vi: 'Hết hạn'});
+  String get recharge => _t({AppLang.en: 'Recharge', AppLang.zh: '充值', AppLang.ja: 'チャージ', AppLang.ko: '충전', AppLang.th: 'เติมเงิน', AppLang.vi: 'Nạp tiền'});
+  String get confirmRecharge => _t({AppLang.en: 'Confirm recharge', AppLang.zh: '确认充值', AppLang.ja: 'チャージ確認', AppLang.ko: '충전 확인', AppLang.th: 'ยืนยันการเติมเงิน', AppLang.vi: 'Xác nhận nạp tiền'});
+  String get rechargeHint => _t({AppLang.en: 'The plan takes effect immediately after recharging.', AppLang.zh: '充值后将立即对该卡生效。', AppLang.ja: 'チャージ後すぐに有効になります。', AppLang.ko: '충전 후 즉시 적용됩니다.', AppLang.th: 'แพ็กเกจจะมีผลทันทีหลังเติมเงิน', AppLang.vi: 'Gói sẽ có hiệu lực ngay sau khi nạp.'});
+  String get rechargeSuccess => _t({AppLang.en: 'Recharge successful', AppLang.zh: '充值成功', AppLang.ja: 'チャージ成功', AppLang.ko: '충전 완료', AppLang.th: 'เติมเงินสำเร็จ', AppLang.vi: 'Nạp tiền thành công'});
+  String get rechargeFailed => _t({AppLang.en: 'Recharge failed', AppLang.zh: '充值失败', AppLang.ja: 'チャージ失敗', AppLang.ko: '충전 실패', AppLang.th: 'เติมเงินไม่สำเร็จ', AppLang.vi: 'Nạp tiền thất bại'});
+  String get queryFailed => _t({AppLang.en: 'Query failed', AppLang.zh: '查询失败', AppLang.ja: '取得に失敗しました', AppLang.ko: '조회 실패', AppLang.th: 'สอบถามไม่สำเร็จ', AppLang.vi: 'Truy vấn thất bại'});
+  String get retry => _t({AppLang.en: 'Retry', AppLang.zh: '重试', AppLang.ja: '再試行', AppLang.ko: '재시도', AppLang.th: 'ลองใหม่', AppLang.vi: 'Thử lại'});
+  String get cancel => _t({AppLang.en: 'Cancel', AppLang.zh: '取消', AppLang.ja: 'キャンセル', AppLang.ko: '취소', AppLang.th: 'ยกเลิก', AppLang.vi: 'Hủy'});
+  String get confirm => _t({AppLang.en: 'Confirm', AppLang.zh: '确认', AppLang.ja: '確認', AppLang.ko: '확인', AppLang.th: 'ยืนยัน', AppLang.vi: 'Xác nhận'});
+
+  // ---- recharge history ----
+  String get rechargeRecords => _t({AppLang.en: 'Recharge history', AppLang.zh: '充值记录', AppLang.ja: 'チャージ履歴', AppLang.ko: '충전 내역', AppLang.th: 'ประวัติการเติมเงิน', AppLang.vi: 'Lịch sử nạp tiền'});
+  String get noRecharges => _t({AppLang.en: 'No recharge orders', AppLang.zh: '还没有充值记录', AppLang.ja: 'チャージ履歴がありません', AppLang.ko: '충전 내역이 없습니다', AppLang.th: 'ยังไม่มีการเติมเงิน', AppLang.vi: 'Chưa có lịch sử nạp'});
+  String get noRechargesHint => _t({AppLang.en: 'Recharge a plan to see it here', AppLang.zh: '充值套餐后会在这里显示', AppLang.ja: 'プランをチャージするとここに表示されます', AppLang.ko: '요금제를 충전하면 여기에 표시됩니다', AppLang.th: 'เติมเงินแพ็กเกจแล้วจะแสดงที่นี่', AppLang.vi: 'Nạp gói sẽ hiển thị ở đây'});
+  String get stPendingPay => _t({AppLang.en: 'Awaiting payment', AppLang.zh: '待支付', AppLang.ja: '支払い待ち', AppLang.ko: '결제 대기', AppLang.th: 'รอชำระเงิน', AppLang.vi: 'Chờ thanh toán'});
+  String get stPaid => _t({AppLang.en: 'Paid', AppLang.zh: '已支付', AppLang.ja: '支払い済み', AppLang.ko: '결제 완료', AppLang.th: 'ชำระแล้ว', AppLang.vi: 'Đã thanh toán'});
+  String get stDone => _t({AppLang.en: 'Recharged', AppLang.zh: '已充值', AppLang.ja: 'チャージ済み', AppLang.ko: '충전 완료', AppLang.th: 'เติมเงินแล้ว', AppLang.vi: 'Đã nạp'});
+  String get stFailed => _t({AppLang.en: 'Failed', AppLang.zh: '充值失败', AppLang.ja: 'チャージ失敗', AppLang.ko: '충전 실패', AppLang.th: 'ล้มเหลว', AppLang.vi: 'Thất bại'});
+  String get stRefunded => _t({AppLang.en: 'Refunded', AppLang.zh: '已退款', AppLang.ja: '返金済み', AppLang.ko: '환불됨', AppLang.th: 'คืนเงินแล้ว', AppLang.vi: 'Đã hoàn tiền'});
+  String get confirmPay => _t({AppLang.en: 'Confirm payment', AppLang.zh: '确认支付', AppLang.ja: '支払い確認', AppLang.ko: '결제 확인', AppLang.th: 'ยืนยันการชำระเงิน', AppLang.vi: 'Xác nhận thanh toán'});
+
+  // ---- my cards (我的卡) ----
+  String get viewMyCards => _t({AppLang.en: 'View my cards', AppLang.zh: '查看我的卡', AppLang.ja: 'カードを見る', AppLang.ko: '내 카드 보기', AppLang.th: 'ดูการ์ดของฉัน', AppLang.vi: 'Xem thẻ của tôi'});
+  String get cardsEmptyTitle => _t({AppLang.en: 'No cards yet', AppLang.zh: '还没有卡', AppLang.ja: 'カードがありません', AppLang.ko: '아직 카드가 없습니다', AppLang.th: 'ยังไม่มีการ์ด', AppLang.vi: 'Chưa có thẻ'});
+  String get cardsEmptyHint => _t({AppLang.en: 'Your cards show up here after purchase', AppLang.zh: '购买套餐后，你的卡会出现在这里', AppLang.ja: '購入したカードはここに表示されます', AppLang.ko: '구매한 카드는 여기에 표시됩니다', AppLang.th: 'การ์ดของคุณจะแสดงที่นี่หลังการซื้อ', AppLang.vi: 'Thẻ sẽ xuất hiện ở đây sau khi mua'});
+  String get autoRefreshOn => _t({AppLang.en: 'Auto refresh on', AppLang.zh: '自动刷新：开', AppLang.ja: '自動更新：オン', AppLang.ko: '자동 새로고침 켜짐', AppLang.th: 'เปิดรีเฟรชอัตโนมัติ', AppLang.vi: 'Tự động làm mới: bật'});
+  String get autoRefreshOff => _t({AppLang.en: 'Auto refresh off', AppLang.zh: '自动刷新：关', AppLang.ja: '自動更新：オフ', AppLang.ko: '자동 새로고침 꺼짐', AppLang.th: 'ปิดรีเฟรชอัตโนมัติ', AppLang.vi: 'Tự động làm mới: tắt'});
+  String get fetching => _t({AppLang.en: 'Fetching…', AppLang.zh: '正在获取…', AppLang.ja: '取得中…', AppLang.ko: '불러오는 중…', AppLang.th: 'กำลังดึงข้อมูล…', AppLang.vi: 'Đang lấy dữ liệu…'});
+  String get updatedAt => _t({AppLang.en: 'Updated', AppLang.zh: '更新于', AppLang.ja: '更新', AppLang.ko: '업데이트', AppLang.th: 'อัปเดตเมื่อ', AppLang.vi: 'Cập nhật lúc'});
+  String get autoEveryMinute => _t({AppLang.en: 'auto refresh every minute', AppLang.zh: '每分钟自动刷新', AppLang.ja: '毎分自動更新', AppLang.ko: '1분마다 자동 새로고침', AppLang.th: 'รีเฟรชอัตโนมัติทุกนาที', AppLang.vi: 'tự động làm mới mỗi phút'});
+  String get dataTotalShort => _t({AppLang.en: 'Total', AppLang.zh: '总量', AppLang.ja: '合計', AppLang.ko: '총량', AppLang.th: 'รวม', AppLang.vi: 'Tổng'});
+  String get noUsageYet => _t({AppLang.en: 'No usage data yet, it updates after activation', AppLang.zh: '暂无流量数据，激活后自动更新', AppLang.ja: '利用データがありません。開通後に更新されます', AppLang.ko: '아직 사용량 데이터가 없습니다. 활성화 후 자동 업데이트됩니다', AppLang.th: 'ยังไม่มีข้อมูลการใช้งาน จะอัปเดตหลังเปิดใช้งาน', AppLang.vi: 'Chưa có dữ liệu dung lượng, sẽ cập nhật sau khi kích hoạt'});
+  String get expiresOn => _t({AppLang.en: 'Expires', AppLang.zh: '到期', AppLang.ja: '有効期限', AppLang.ko: '만료', AppLang.th: 'หมดอายุ', AppLang.vi: 'Hết hạn'});
+  String get statusIssued => _t({AppLang.en: 'Not activated', AppLang.zh: '待激活', AppLang.ja: '未開通', AppLang.ko: '활성화 대기', AppLang.th: 'ยังไม่เปิดใช้งาน', AppLang.vi: 'Chưa kích hoạt'});
+  String get statusUsing => _t({AppLang.en: 'In use', AppLang.zh: '使用中', AppLang.ja: '使用中', AppLang.ko: '사용 중', AppLang.th: 'กำลังใช้งาน', AppLang.vi: 'Đang dùng'});
+  String get physicalCard => _t({AppLang.en: 'Physical SIM', AppLang.zh: '实体卡', AppLang.ja: '物理SIM', AppLang.ko: '실물 카드', AppLang.th: 'ซิมการ์ด', AppLang.vi: 'SIM vật lý'});
+  String get defaultCard => _t({AppLang.en: 'Default card', AppLang.zh: '默认卡', AppLang.ja: 'デフォルトカード', AppLang.ko: '기본 카드', AppLang.th: 'การ์ดหลัก', AppLang.vi: 'Thẻ mặc định'});
+  String get noCardData => _t({AppLang.en: 'No card data', AppLang.zh: '暂无卡片数据', AppLang.ja: 'カード情報がありません', AppLang.ko: '카드 정보가 없습니다', AppLang.th: 'ไม่มีข้อมูลการ์ด', AppLang.vi: 'Chưa có dữ liệu thẻ'});
+
+  // ---- plan detail ----
+  String get kindSim => _t({AppLang.en: 'SIM type', AppLang.zh: '类型', AppLang.ja: '種類', AppLang.ko: '유형', AppLang.th: 'ประเภท', AppLang.vi: 'Loại'});
+  String get kindPhysicalSim => _t({AppLang.en: 'Physical SIM', AppLang.zh: '实体 SIM', AppLang.ja: '物理 SIM', AppLang.ko: '실물 SIM', AppLang.th: 'ซิมการ์ด', AppLang.vi: 'SIM vật lý'});
+  String get kindPhysicalCard => _t({AppLang.en: 'Physical card', AppLang.zh: '实体卡', AppLang.ja: '物理カード', AppLang.ko: '실물 카드', AppLang.th: 'การ์ดซิม', AppLang.vi: 'Thẻ vật lý'});
+
+  // ---- plan card ----
+  String get view => _t({AppLang.en: 'View', AppLang.zh: '查看', AppLang.ja: '詳細', AppLang.ko: '보기', AppLang.th: 'ดู', AppLang.vi: 'Xem'});
+  String get addToCartShort => _t({AppLang.en: 'Add to cart', AppLang.zh: '加入购物车', AppLang.ja: 'カートに入れる', AppLang.ko: '장바구니에 담기', AppLang.th: 'เพิ่มลงตะกร้า', AppLang.vi: 'Thêm vào giỏ'});
 }

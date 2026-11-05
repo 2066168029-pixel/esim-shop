@@ -9,6 +9,7 @@ import '../api.dart';
 import '../currency.dart';
 import '../store.dart';
 import '../theme.dart';
+import '../pay_icons.dart';
 import '../widgets.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -21,6 +22,10 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Order? _order;
   String? _err;
+
+  /// Guards the PayPal capture button while the request is in flight, so a
+  /// double tap cannot fire two captures.
+  bool _busyPay = false;
 
   @override
   void initState() {
@@ -88,8 +93,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _payWithPayPal(Order o) async {
+    final api = context.read<AppState>().api;
     try {
-      final res = await context.read<AppState>().api.paypalCreate(o.orderNo);
+      final res = await api.paypalCreate(o.orderNo);
       final url = res['approve_url'] as String? ?? '';
       if (url.isEmpty) {
         _snack('PayPal 下单失败，请稍后重试', error: true);
@@ -99,12 +105,91 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (uri != null) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-      if (mounted) {
-        _snack('完成 PayPal 付款后返回本页，点击刷新订单状态');
-        _load();
+
+      // PayPal only authorises in the browser. The money is not taken until the
+      // order is captured, and the backend will not settle it on its own. Ask
+      // the user to confirm once they are back, then capture.
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('已完成付款？'),
+          content: const Text(
+            '在 PayPal 完成付款后返回本页面。\n\n'
+            '点击「确认支付」以完成扣款；如果还没付款，点击「稍后」会保留订单，'
+            '稍后仍可在本页继续支付。',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('稍后')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('确认支付')),
+          ],
+        ),
+      );
+      if (ok != true) {
+        _snack('已保留订单，稍后可在本页继续支付');
+        await _load();
+        return;
       }
+
+      await _capturePayPal(o);
     } catch (e) {
       _snack('$e', error: true);
+    }
+  }
+
+  /// Capture a PayPal authorisation and settle the order.
+  ///
+  /// The backend is idempotent, so pressing this twice is safe: the second call
+  /// returns already=true instead of charging again.
+  Future<void> _capturePayPal(Order o) async {
+    final api = context.read<AppState>().api;
+    setState(() => _busyPay = true);
+    try {
+      final r = await api.paypalCapture(o.orderNo);
+      final status = r['status'] as String? ?? '';
+      if (status == 'paid' || status == 'fulfilled' || r['ok'] == true) {
+        _snack('支付成功，eSIM 已发放', );
+        await _load();
+      } else {
+        _snack('支付未完成（状态：$status），请稍后在订单页重试', error: true);
+        await _load();
+      }
+    } catch (e) {
+      _snack('确认支付失败：$e', error: true);
+      await _load();
+    } finally {
+      if (mounted) setState(() => _busyPay = false);
+    }
+  }
+
+  /// Cancel a still-pending order, with a confirmation step.
+  Future<void> _cancelOrder(Order o) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('取消订单'),
+        content: const Text('取消后订单不可恢复。如果已经付款，请先联系客服。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('返回')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('确认取消'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (!mounted) return;
+
+    try {
+      final api = context.read<AppState>().api;
+      await api.cancelOrder(o.orderNo);
+      if (!mounted) return;
+      _snack('订单已取消');
+      await _load();
+    } catch (e) {
+      if (mounted) _snack('取消失败：$e', error: true);
     }
   }
 
@@ -220,8 +305,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => _payNow(o),
-                child: const Text('去支付'),
+                onPressed: _busyPay ? null : () => _payNow(o),
+                child: _busyPay
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('去支付'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: _busyPay ? null : () => _cancelOrder(o),
+                child: const Text(
+                  '取消订单',
+                  style: TextStyle(color: AppColors.danger, fontSize: 13),
+                ),
               ),
             ),
           ],
@@ -402,7 +504,12 @@ class _PaySheet extends StatelessWidget {
     final icon = _icons[g.provider] ?? Icons.payments;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: AppColors.primary, size: 26),
+      leading: SizedBox(
+        width: 34,
+        child: PayIcons.iconUrl(g.provider).isNotEmpty
+            ? Center(child: PayIcon(provider: g.provider, size: 26))
+            : Icon(icon, color: AppColors.primary, size: 26),
+      ),
       title: Text(g.label, style: const TextStyle(fontWeight: FontWeight.w700)),
       trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
       onTap: () async {

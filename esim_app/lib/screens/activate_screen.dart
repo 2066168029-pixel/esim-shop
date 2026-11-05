@@ -9,7 +9,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../topbar.dart';
 import '../widgets.dart';
-import 'activate_webview_screen.dart';
+import 'card_portal_screen.dart';
 import 'card_writer_screen_v3.dart';
 import 'native_lpa_screen.dart';
 import 'scan_screen.dart';
@@ -80,14 +80,15 @@ class _ActivateScreenState extends State<ActivateScreen> {
     }
   }
 
-  /// Open the activation portal device page for [iccid]. If empty, the portal's
-  /// own login page is shown so the user can log in manually.
+  /// 用原生页面查询这张卡的套餐并充值。
+  ///
+  /// 以前这里跳的是上游的 WebView 门户（api.zkm4m.cn/kyhl-weixin-1.0），
+  /// 现在改走我们自己的 /api/card 接口，体验和配色都统一了。
   void _openPortal(String iccid) {
-    final app = context.read<AppState>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ActivateWebViewScreen(iccid: iccid, title: app.t.activateEsim),
+        builder: (_) => CardPortalScreen(iccid: iccid),
       ),
     );
   }

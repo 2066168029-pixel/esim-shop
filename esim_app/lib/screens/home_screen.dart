@@ -6,10 +6,10 @@ import '../api.dart';
 import '../countries.dart';
 import '../i18n.dart';
 import '../store.dart';
+import 'plan_detail_v2.dart';
 import '../theme.dart';
 import '../topbar.dart';
 import '../widgets.dart';
-import 'support_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int tab)? onGoTab;
@@ -37,6 +37,11 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       setState(() => _err = '$e');
     }
+    // The hero card reports how many cards the customer holds, but the stats
+    // were only ever refreshed from the 我的 tab, so this stayed at 0 here and
+    // the card looked empty for signed-in users.
+    if (!mounted) return;
+    context.read<AppState>().refreshEsimStats();
   }
 
   void _go(int tab) {
@@ -85,6 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _hero(dynamic t) {
+    // This card used to be hard-coded to the "not signed in" pill and the
+    // "no eSIM yet" copy, so a signed-in customer always saw 未登录. Read the
+    // live state instead and show what they actually hold.
+    final app = context.watch<AppState>();
+    final loggedIn = app.isLoggedIn;
+    final active = app.activeEsimCount;
+    final pillText = !loggedIn ? t.notLoggedIn : (active > 0 ? '$active ${t.myEsim}' : t.noEsimYet);
+    final headline = !loggedIn
+        ? t.noEsimYet
+        : (active > 0 ? '$active \u5f20\u4f7f\u7528\u4e2d' : t.noEsimYet);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
@@ -98,13 +114,13 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               gradient: AppColors.heroBlue,
               borderRadius: BorderRadius.circular(AppRadii.big),
-              boxShadow: const [BoxShadow(color: Color(0x330A66FF), blurRadius: 24, offset: Offset(0, 12))],
+              boxShadow: AppShadow.hero,
             ),
             child: Stack(
               children: [
                 Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(AppRadii.big), child: CustomPaint(painter: _WorldMapPainter()))),
                 Padding(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -117,15 +133,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                             decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(20)),
-                            child: Text(t.notLoggedIn, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                            child: Text(pillText, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Text(t.noEsimYet, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 4),
-                      Text(t.pickDest, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
-                      const SizedBox(height: 14),
+                      Text(headline,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.3,
+                              height: 1.2)),
+                      const SizedBox(height: 6),
+                      Text(t.pickDest,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: .78),
+                              fontSize: 12.5,
+                              height: 1.5)),
+                      const SizedBox(height: 18),
                       Row(
                         children: [
                           ElevatedButton(
@@ -145,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () => _go(3),
-                            child: Text(t.myPlans),
+                            child: Text(loggedIn ? t.myEsim : t.myPlans),
                           ),
                         ],
                       ),
@@ -161,43 +187,62 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _quickActions(dynamic t) {
-    final actions = [
-      (Icons.download_rounded, t.buyEsim, () => _go(1)),
-      (Icons.qr_code_scanner_rounded, t.scanQr, () => _go(2)),
-      (Icons.receipt_long_outlined, t.myOrders, () => _go(3)),
-      (Icons.support_agent, t.helpCenter, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen()))),
+    final actions = <(IconData, String, VoidCallback, Color)>[
+      (Icons.explore_rounded, t.buyEsim, () => _go(1), AppColors.primary),
+      (Icons.qr_code_scanner_rounded, t.scanQr, () => _go(2), AppColors.success),
+      (Icons.receipt_long_rounded, t.myOrders, () => _go(3), AppColors.warn),
+      (Icons.support_agent_rounded, t.helpCenter, () => _go(4), AppColors.orange),
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 22, 8, 0),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
       child: Row(
-        children: actions.map((a) {
-          return Expanded(
-            child: Column(
-              children: [
-                InkWell(
-                  onTap: a.$3,
-                  borderRadius: BorderRadius.circular(30),
-                  child: Container(
-                    width: 58, height: 58,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.heroBlue,
-                      shape: BoxShape.circle,
-                      boxShadow: const [BoxShadow(color: Color(0x330A66FF), blurRadius: 16, offset: Offset(0, 8))],
-                    ),
-                    child: Icon(a.$1, color: Colors.white, size: 26),
+        children: [
+          for (var k = 0; k < actions.length; k++) ...[
+            if (k > 0) const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: actions[k].$3,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: AppShadow.card,
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: actions[k].$4.withValues(alpha: .11),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Icon(actions[k].$1, size: 19, color: actions[k].$4),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        actions[k].$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSub,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(a.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text), textAlign: TextAlign.center),
-              ],
+              ),
             ),
-          );
-        }).toList(),
+          ],
+        ],
       ),
     );
   }
 
-  /// Rotating travel tip from the content API (falls back to a default).
   Widget _tipFooter(dynamic t) {
     final app = context.read<AppState>();
     final tips = app.content['home_tip'] ?? const [];
@@ -276,7 +321,7 @@ class PlanCard extends StatelessWidget {
     final t = app.t;
     return AppCard(
       padding: const EdgeInsets.all(12),
-      onTap: () => _buy(context),
+      onTap: () => _openDetail(context),
       child: Row(
         children: [
           ClipRRect(
@@ -302,11 +347,16 @@ class PlanCard extends StatelessWidget {
                     Text(app.price(plan.price), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: -0.5)),
                     const Spacer(),
                     GestureDetector(
-                      onTap: () => _buy(context),
+                      onTap: () => _openDetail(context),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(gradient: AppColors.heroBlue, borderRadius: BorderRadius.circular(11)),
-                        child: Text(t.buy, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.heroBlue,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Text(t.view,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -319,14 +369,12 @@ class PlanCard extends StatelessWidget {
     );
   }
 
-  void _buy(BuildContext context) {
-    final app = context.read<AppState>();
-    app.addToCart(plan);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${app.t.addedToCart}: ${plan.title}'),
-      backgroundColor: AppColors.success,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
+  /// 点卡片进商品详情页
+  void _openDetail(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PlanDetailScreenV2(plan: plan)),
+    );
   }
+
 }

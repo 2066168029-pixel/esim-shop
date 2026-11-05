@@ -685,14 +685,12 @@ class _CardWriterScreenV2State extends State<CardWriterScreenV2> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                t.cwPasswordPrompt(card.name.isEmpty ? card.id : card.name),
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 8),
+              // One instruction only: where the password comes from. The
+              // device-name line and the long note about Bluetooth PINs were
+              // noise on a dialog whose only action is typing one value.
               Text(
                 t.cwPasswordNote,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF8C8C8C)),
+                style: const TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 16),
               TextField(

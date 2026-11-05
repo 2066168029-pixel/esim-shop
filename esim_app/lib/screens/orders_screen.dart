@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -116,15 +117,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
         separatorBuilder: (_, i) => const SizedBox(width: 8),
         itemBuilder: (_, i) => GestureDetector(
           onTap: () => setState(() => _tab = i),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             decoration: BoxDecoration(
               color: _tab == i ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _tab == i ? AppColors.primary : AppColors.border, width: 1.2),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                  color: _tab == i ? AppColors.primary : AppColors.border, width: 1.2),
+              boxShadow: _tab == i
+                  ? [BoxShadow(color: AppColors.primary.withValues(alpha: .25), blurRadius: 10, offset: const Offset(0, 3))]
+                  : null,
             ),
             alignment: Alignment.center,
-            child: Text(labels[i], style: TextStyle(color: _tab == i ? Colors.white : AppColors.text, fontSize: 13, fontWeight: FontWeight.w700)),
+            child: Text(labels[i],
+                style: TextStyle(
+                    color: _tab == i ? Colors.white : AppColors.textSub,
+                    fontSize: 13,
+                    fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w600)),
           ),
         ),
       ),
@@ -150,9 +160,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _list(AppState app) {
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       itemCount: _filtered.length,
-      separatorBuilder: (_, i) => const SizedBox(height: 14),
+      separatorBuilder: (_, i) => const SizedBox(height: 11),
       itemBuilder: (_, i) => _orderCard(app, _filtered[i]),
     );
   }
@@ -164,96 +174,223 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final gb = _estimateGb(o);
     final used = firstEsim?.dataUsedMb ?? 0;
     final remainMb = (gb * 1024 - used).clamp(0, gb * 1024);
+    final pending = _isPending(o);
 
-    return AppCard(
-      onTap: () => _openDetail(app, o),
-      child: Column(
-        children: [
-          // header row
-          Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: pending ? const Color(0xFFFFE0B2) : AppColors.border),
+        boxShadow: AppShadow.card,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openDetail(app, o),
+          child: Column(
             children: [
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis)),
-              _statusPill(app, o.status),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.event_outlined, size: 12, color: AppColors.muted),
-            const SizedBox(width: 4),
-            Text(o.createdAt != null ? DateFormat('yyyy-MM-dd').format(o.createdAt!.toLocal()) : '',
-                style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
-            const Spacer(),
-            Text(formatInCurrency(o.total, o.currency), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
-          ]),
-          // Pending orders: show a pay CTA right on the card.
-          if (_isPending(o)) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(orderNo: o.orderNo))),
-                icon: const Icon(Icons.payment, size: 18),
-                label: Text(app.t.payNow),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+                child: Column(
+                  children: [
+                    // ---- 标题行 ----
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(title,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.35),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 8),
+                        _statusPill(app, o.status),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    // ---- 单号 / 日期 / 金额 ----
+                    Row(
+                      children: [
+                        Text(
+                          o.createdAt != null
+                              ? DateFormat('yyyy-MM-dd').format(o.createdAt!.toLocal())
+                              : '',
+                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 2.5, height: 2.5,
+                          decoration: const BoxDecoration(
+                              color: AppColors.muted, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('No.${o.orderNo.length > 8 ? o.orderNo.substring(o.orderNo.length - 8) : o.orderNo}',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.muted,
+                                fontFeatures: [FontFeature.tabularFigures()])),
+                        const Spacer(),
+                        Text(formatInCurrency(o.total, o.currency),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.35,
+                                height: 1.1,
+                                fontFeatures: [FontFeature.tabularFigures()])),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-          if (firstEsim != null) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                SizedBox(width: 72, height: 72, child: _UsageRing(usedMb: used, totalGb: gb)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+
+              // ---- 待支付 CTA ----
+              if (pending)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 13),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        backgroundColor: AppColors.warn,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(orderNo: o.orderNo))),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.payments_rounded, size: 17),
+                          const SizedBox(width: 6),
+                          Text(app.t.payNow,
+                              style: const TextStyle(
+                                  fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ---- 流量用量 ----
+              if (firstEsim != null) ...[
+                Container(
+                  margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
                     children: [
-                      Text(t.dataBalance, style: const TextStyle(fontSize: 11.5, color: AppColors.textSub)),
-                      Text('${(remainMb / 1024).toStringAsFixed(1)} GB',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: (used / (gb * 1024)).clamp(0.0, 1.0),
-                          minHeight: 6,
-                          backgroundColor: AppColors.border,
-                          valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                      SizedBox(width: 62, height: 62,
+                          child: _UsageRing(usedMb: used, totalGb: gb)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.dataBalance,
+                                style: const TextStyle(fontSize: 10.5, color: AppColors.muted)),
+                            const SizedBox(height: 2),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text((remainMb / 1024).toStringAsFixed(1),
+                                    style: const TextStyle(
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -.6,
+                                        height: 1.0,
+                                        fontFeatures: [FontFeature.tabularFigures()])),
+                                const SizedBox(width: 2),
+                                const Text('GB',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.muted)),
+                              ],
+                            ),
+                            const SizedBox(height: 7),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: (used / (gb * 1024)).clamp(0.0, 1.0),
+                                minHeight: 5,
+                                backgroundColor: AppColors.border,
+                                valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text('${t.used} ${(used / 1024).toStringAsFixed(1)} / ${gb} GB',
+                                style: const TextStyle(fontSize: 10.5, color: AppColors.muted)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text('${t.used} ${(used / 1024).toStringAsFixed(1)}GB / ${gb}GB',
-                          style: const TextStyle(fontSize: 11, color: AppColors.muted)),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(child: _outlineBtn(Icons.qr_code_2, t.viewQr, () => _showQr(app, firstEsim))),
-              const SizedBox(width: 8),
-              Expanded(child: _outlineBtn(Icons.replay, t.buyAgain, () => widget.onGoTab?.call(1))),
-              const SizedBox(width: 8),
-              Expanded(child: _outlineBtn(Icons.help_outline, t.help, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage())))),
-            ]),
-          ],
-        ],
+                // ---- 操作按钮 ----
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 13),
+                  child: Row(
+                    children: [
+                      Expanded(child: _ghostBtn(Icons.qr_code_2_rounded, t.viewQr, () => _showQr(app, firstEsim))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _ghostBtn(Icons.replay_rounded, t.buyAgain, () => widget.onGoTab?.call(1))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _ghostBtn(Icons.help_outline_rounded, t.help,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage())))),
+                    ],
+                  ),
+                ),
+              ] else
+                const SizedBox(height: 4),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _outlineBtn(IconData icon, String label, VoidCallback onTap) => OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          side: const BorderSide(color: AppColors.primary, width: 1.2),
+  Widget _ghostBtn(IconData icon, String label, VoidCallback onTap) => Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 14, color: AppColors.textSub),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSub)),
+                ),
+              ],
+            ),
+          ),
         ),
-        onPressed: onTap,
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.primary), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ]),
       );
 
   Widget _statusPill(AppState app, String status) {

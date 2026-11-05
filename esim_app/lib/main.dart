@@ -152,26 +152,117 @@ class _ShellState extends State<Shell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+      extendBody: true,
+      bottomNavigationBar: _BottomBar(
+        index: _index,
         items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home_outlined), activeIcon: const Icon(Icons.home), label: t.navHome),
-          BottomNavigationBarItem(icon: const Icon(Icons.grid_view_outlined), activeIcon: const Icon(Icons.grid_view), label: t.navPlans),
-          BottomNavigationBarItem(icon: const Icon(Icons.qr_code_scanner_outlined), activeIcon: const Icon(Icons.qr_code_scanner), label: t.navActivate),
-          BottomNavigationBarItem(icon: const Icon(Icons.receipt_long_outlined), activeIcon: const Icon(Icons.receipt_long), label: t.navOrders),
-          BottomNavigationBarItem(icon: const Icon(Icons.person_outline), activeIcon: const Icon(Icons.person), label: t.navMe),
+          (Icons.home_outlined, Icons.home_rounded, t.navHome),
+          (Icons.explore_outlined, Icons.explore_rounded, t.navPlans),
+          (Icons.qr_code_scanner_outlined, Icons.qr_code_scanner_rounded, t.navActivate),
+          (Icons.receipt_long_outlined, Icons.receipt_long_rounded, t.navOrders),
+          (Icons.person_outline_rounded, Icons.person_rounded, t.navMe),
         ],
+        onTap: (i) => setState(() => _index = i),
       ),
       floatingActionButton: context.watch<AppState>().cartCount > 0 && _index != 2
-          ? FloatingActionButton.extended(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.shopping_cart_outlined),
-              label: Text('${t.cart} (${context.watch<AppState>().cartCount})'),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 76),
+              child: FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const CartScreen())),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                icon: const Icon(Icons.shopping_bag_rounded, size: 20),
+                label: Text(
+                  '${t.cart} · ${context.watch<AppState>().cartCount}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
             )
           : null,
+    );
+  }
+}
+
+
+/// 自定义底部导航：白底毛玻璃 + 选中态药丸底
+class _BottomBar extends StatelessWidget {
+  final int index;
+  final List<(IconData, IconData, String)> items;
+  final ValueChanged<int> onTap;
+
+  const _BottomBar({required this.index, required this.items, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .95),
+        border: const Border(top: BorderSide(color: AppColors.borderSoft)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: .05),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.only(bottom: bottom > 0 ? bottom : 4),
+      child: SizedBox(
+        height: 58,
+        child: Row(
+          children: [
+            for (var i = 0; i < items.length; i++)
+              Expanded(child: _item(i, items[i])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _item(int i, (IconData, IconData, String) item) {
+    final active = i == index;
+    return InkWell(
+      onTap: () => onTap(i),
+      highlightColor: Colors.transparent,
+      splashColor: Colors.transparent,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primaryWash : Colors.transparent,
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedScale(
+              duration: const Duration(milliseconds: 180),
+              scale: active ? 1.0 : .94,
+              child: Icon(
+                active ? item.$2 : item.$1,
+                size: 21,
+                color: active ? AppColors.primary : AppColors.muted,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              item.$3,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.1,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? AppColors.primary : AppColors.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

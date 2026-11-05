@@ -537,3 +537,299 @@ class SimJob {
     }
   }
 }
+
+
+
+
+
+/// 上游卡流量查询结果。对应后端 /api/orders/esims/{id}/usage。
+class EsimUsage {
+  final int id;
+  final String status;
+  final double usedMb;
+  final double totalMb;
+  final DateTime? expiresAt;
+
+  const EsimUsage({
+    required this.id,
+    required this.status,
+    required this.usedMb,
+    required this.totalMb,
+    this.expiresAt,
+  });
+
+  double get remainingMb {
+    if (totalMb <= 0) return 0;
+    final r = totalMb - usedMb;
+    return r < 0 ? 0 : r;
+  }
+
+  double get percent {
+    if (totalMb <= 0) return 0;
+    final p = usedMb / totalMb * 100;
+    return p > 100 ? 100 : p;
+  }
+
+  bool get hasQuota => totalMb > 0;
+
+  factory EsimUsage.fromJson(Map<String, dynamic> j) => EsimUsage(
+        id: (j["id"] ?? 0) as int,
+        status: (j["status"] ?? "") as String,
+        usedMb: ((j["data_used_mb"] ?? 0) as num).toDouble(),
+        totalMb: ((j["data_total_mb"] ?? 0) as num).toDouble(),
+        expiresAt: j["expires_at"] != null ? DateTime.tryParse(j["expires_at"]) : null,
+      );
+
+  /// 人类可读的流量。小于 1GB 显示 MB，否则显示 GB。
+  static String fmt(double mb) {
+    if (mb <= 0) return "0 MB";
+    if (mb >= 1024) {
+      final gb = mb / 1024;
+      return "${gb.toStringAsFixed(gb >= 10 ? 1 : 2)} GB";
+    }
+    return "${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB";
+  }
+}
+/// 已购买的卡，「我的卡」列表项。
+class MyEsim {
+  final int id;
+  final String orderNo;
+  final int orderId;
+  final String iccid;
+  final String status;
+  final String planTitle;
+  /// "esim" 或 "physical_card"。实体卡的名字必须由前端按语言显示，
+  /// 之前后端写死中文「实体卡」，导致其他语言页面上出现中文。
+  final String kind;
+  final String lpaCode;
+  final String qrPath;
+  final String smdpAddress;
+  final String matchingId;
+  final DateTime? activatedAt;
+  final DateTime? expiresAt;
+  final double dataUsedMb;
+  final double dataTotalMb;
+  final DateTime? usageCheckedAt;
+
+  const MyEsim({
+    required this.id,
+    required this.orderNo,
+    required this.orderId,
+    required this.iccid,
+    required this.status,
+    required this.planTitle,
+    this.kind = 'esim',
+    required this.lpaCode,
+    required this.qrPath,
+    required this.smdpAddress,
+    required this.matchingId,
+    this.activatedAt,
+    this.expiresAt,
+    required this.dataUsedMb,
+    required this.dataTotalMb,
+    this.usageCheckedAt,
+  });
+
+  double get remainingMb {
+    if (dataTotalMb <= 0) return 0;
+    final r = dataTotalMb - dataUsedMb;
+    return r < 0 ? 0 : r;
+  }
+
+  double get percent {
+    if (dataTotalMb <= 0) return 0;
+    final p = dataUsedMb / dataTotalMb * 100;
+    return p > 100 ? 100 : p;
+  }
+
+  bool get hasQuota => dataTotalMb > 0;
+
+  /// 实体卡（后台绑定的物理卡，没有订单行）
+  bool get isPhysicalCard => kind == 'physical_card' || id < 0;
+  String get qrUrl => qrPath.isEmpty ? "" : ApiConfig.resolve(qrPath);
+
+  factory MyEsim.fromJson(Map<String, dynamic> j) => MyEsim(
+        id: (j["id"] ?? 0) as int,
+        orderNo: (j["order_no"] ?? "") as String,
+        orderId: (j["order_id"] ?? 0) as int,
+        iccid: (j["iccid"] ?? "") as String,
+        status: (j["status"] ?? "") as String,
+        planTitle: (j["plan_title"] ?? "") as String,
+        kind: (j["kind"] ?? "esim") as String,
+        lpaCode: (j["lpa_code"] ?? "") as String,
+        qrPath: (j["qr_path"] ?? "") as String,
+        smdpAddress: (j["smdp_address"] ?? "") as String,
+        matchingId: (j["matching_id"] ?? "") as String,
+        activatedAt: j["activated_at"] != null ? DateTime.tryParse(j["activated_at"]) : null,
+        expiresAt: j["expires_at"] != null ? DateTime.tryParse(j["expires_at"]) : null,
+        dataUsedMb: ((j["data_used_mb"] ?? 0) as num).toDouble(),
+        dataTotalMb: ((j["data_total_mb"] ?? 0) as num).toDouble(),
+        usageCheckedAt: j["usage_checked_at"] != null
+            ? DateTime.tryParse(j["usage_checked_at"])
+            : null,
+      );
+
+  /// 流量格式化：小于 1GB 用 MB，否则用 GB
+  static String fmt(double mb) {
+    if (mb <= 0) return "0 MB";
+    if (mb >= 1024) {
+      final gb = mb / 1024;
+      return "${gb.toStringAsFixed(gb >= 10 ? 1 : 2)} GB";
+    }
+    return "${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB";
+  }
+}
+/// 卡流量 / 状态查询结果（用户端，对应 /api/card/flow）。
+class CardFlowInfo {
+  final bool ok;
+  final String simId;
+  final double? totalFlow;
+  final double? usedFlow;
+  final double? remainingFlow;
+  final String expireDate;
+  final String status;
+  final String? error;
+
+  const CardFlowInfo({
+    required this.ok,
+    this.simId = "",
+    this.totalFlow,
+    this.usedFlow,
+    this.remainingFlow,
+    this.expireDate = "",
+    this.status = "",
+    this.error,
+  });
+
+  factory CardFlowInfo.fromJson(Map<String, dynamic> j) => CardFlowInfo(
+        ok: j["ok"] == true,
+        simId: (j["sim_id"] ?? "") as String,
+        totalFlow: (j["total_flow"] as num?)?.toDouble(),
+        usedFlow: (j["used_flow"] as num?)?.toDouble(),
+        remainingFlow: (j["remaining_flow"] as num?)?.toDouble(),
+        expireDate: (j["expire_date"] ?? "") as String,
+        status: (j["status"] ?? "") as String,
+        error: j["error"] as String?,
+      );
+
+  static String fmt(double mb) {
+    if (mb <= 0) return "0 MB";
+    if (mb >= 1024) {
+      final gb = mb / 1024;
+      return "${gb.toStringAsFixed(gb >= 10 ? 1 : 2)} GB";
+    }
+    return "${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB";
+  }
+}
+
+/// 可充值的套餐（对应 /api/card/packages）。
+class CardPackage {
+  final String id;
+  final String mealId;
+  final String name;
+  final String money;
+  final String desc;
+  final String flowSizeMb;
+  final int days;
+
+  const CardPackage({
+    required this.id,
+    this.mealId = "",
+    required this.name,
+    required this.money,
+    this.desc = "",
+    this.flowSizeMb = "",
+    this.days = 0,
+  });
+
+  /// 下单要用 mealId，没有就退回 id
+  String get orderId => mealId.isNotEmpty ? mealId : id;
+
+  static String fmtFlow(String mb) {
+    final v = double.tryParse(mb) ?? 0;
+    if (v <= 0) return "—";
+    if (v >= 1024) {
+      final gb = v / 1024;
+      return "${gb.toStringAsFixed(gb >= 10 ? 1 : 2)} GB";
+    }
+    return "${v.toStringAsFixed(0)} MB";
+  }
+
+  factory CardPackage.fromJson(Map<String, dynamic> j) => CardPackage(
+        id: "${j["id"] ?? ""}",
+        mealId: "${j["meal_id"] ?? ""}",
+        name: (j["name"] ?? "") as String,
+        money: "${j["money"] ?? ""}",
+        desc: (j["desc"] ?? "") as String,
+        flowSizeMb: "${j["flow_size_mb"] ?? ""}",
+        days: (j["days"] as num?)?.toInt() ?? 0,
+      );
+}
+/// findByCardNo 的返回：当前套餐 + 可充值套餐
+class CardPackagesResult {
+  final CardPackage? current;
+  final List<CardPackage> packages;
+  final List<CardPackage> extra;
+
+  const CardPackagesResult({
+    this.current,
+    this.packages = const [],
+    this.extra = const [],
+  });
+
+  factory CardPackagesResult.fromJson(Map<String, dynamic> j) => CardPackagesResult(
+        current: j["current"] is Map
+            ? CardPackage.fromJson((j["current"] as Map).cast<String, dynamic>())
+            : null,
+        packages: ((j["packages"] ?? []) as List)
+            .map((e) => CardPackage.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
+        extra: ((j["extra_packages"] ?? []) as List)
+            .map((e) => CardPackage.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+}
+
+/// 用户充值订单（对应 /api/recharge/orders）
+class RechargeOrder {
+  final int id;
+  final String orderNo;
+  final String simId;
+  final String mealId;
+  final String mealName;
+  final String status;
+  final double amount;
+  final String currency;
+  final String upstreamMsg;
+  final DateTime? createdAt;
+
+  const RechargeOrder({
+    required this.id,
+    required this.orderNo,
+    required this.simId,
+    required this.mealId,
+    required this.mealName,
+    required this.status,
+    required this.amount,
+    required this.currency,
+    this.upstreamMsg = "",
+    this.createdAt,
+  });
+
+  bool get isDone => status == "fulfilled";
+  bool get isFailed => status == "failed";
+  bool get isPending => status == "pending";
+
+  factory RechargeOrder.fromJson(Map<String, dynamic> j) => RechargeOrder(
+        id: (j["id"] ?? 0) as int,
+        orderNo: (j["order_no"] ?? "") as String,
+        simId: (j["sim_id"] ?? "") as String,
+        mealId: (j["meal_id"] ?? "") as String,
+        mealName: (j["meal_name"] ?? "") as String,
+        status: (j["status"] ?? "") as String,
+        amount: ((j["amount"] ?? 0) as num).toDouble(),
+        currency: (j["currency"] ?? "USD") as String,
+        upstreamMsg: (j["upstream_msg"] ?? "") as String,
+        createdAt: j["created_at"] != null ? DateTime.tryParse(j["created_at"]) : null,
+      );
+}

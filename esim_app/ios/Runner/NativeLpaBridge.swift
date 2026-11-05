@@ -327,32 +327,23 @@ final class NativeLpaBridge: NSObject {
 
       self.teardownConnectionSync()
 
-      // 文档 3.2.6：显式设置 GATT UUID，不依赖 SDK 默认值。
-      let probe = EuiccBleDevice(
-        bleManager: central,
-        blePeripheral: peripheral,
-        bleDataLengthSize: 4)
-      probe.setEuiccBleServiceUUID(
-        serviceUUID: Self.euiccService,
-        rxUUID: Self.euiccRx,
-        txUUID: Self.euiccTx)
-
+      // 与 demo 完全一致：不调用 setEuiccBleServiceUUID。
+      // SDK 内置默认值就是 6e400001/2/3-...，主动设置反而会因归一化
+      // 方式不同而匹配不上（表现为数据发出去没人应答、getDeviceInfo 阻塞）。
       let identity = peripheral.identifier.uuidString
       let device: EuiccBleDevice
       if self.preferSecure {
-        let secure = SecurityBleDevice(
+        device = SecurityBleDevice(
           identity: identity,
           bleManager: central,
           blePeripheral: peripheral,
           bleDataLengthSize: 4)
-        secure.setEuiccBleServiceUUID(
-          serviceUUID: Self.euiccService,
-          rxUUID: Self.euiccRx,
-          txUUID: Self.euiccTx)
-        device = secure
         self.log("mode: SecurityBleDevice (secure)")
       } else {
-        device = probe
+        device = EuiccBleDevice(
+          bleManager: central,
+          blePeripheral: peripheral,
+          bleDataLengthSize: 4)
         self.log("mode: plain EuiccBleDevice")
       }
 
@@ -385,8 +376,10 @@ final class NativeLpaBridge: NSObject {
           // 正在等用户输密码：暂停判断
           if self.pskPrompting { lastProgress = DispatchTime.now(); continue }
           let elapsed = DispatchTime.now().uptimeNanoseconds &- lastProgress.uptimeNanoseconds
-          if elapsed > 20_000_000_000 {   // 20s 无进度
-            self.log("watchdog: no progress for 20s -> fail")
+          // getDeviceInfo 是阻塞调用，SDK 自己的超时是 180s；
+          // 读卡慢的时候 20s 会误杀，放宽到 200s。
+          if elapsed > 200_000_000_000 {   // 200s 无进度
+            self.log("watchdog: no progress for 200s -> fail")
             done(false)
             return
           }
@@ -458,8 +451,11 @@ final class NativeLpaBridge: NSObject {
       return self.promptForPasswordBlocking()
     }
 
-    self.log("getDeviceInfo attempt \(attempt)")
+    self.log("getDeviceInfo attempt \(attempt) -- calling SDK (this blocks)")
+    let t0 = DispatchTime.now()
     let info = device.getDeviceInfo()
+    let ms = (DispatchTime.now().uptimeNanoseconds &- t0.uptimeNanoseconds) / 1_000_000
+    self.log("getDeviceInfo returned after \(ms)ms, info=\(info == nil ? "nil" : "ok")")
 
     guard let info else {
       self.log("getDeviceInfo returned nil (attempt \(attempt))")

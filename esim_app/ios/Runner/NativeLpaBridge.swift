@@ -77,7 +77,7 @@ final class NativeLpaBridge: NSObject {
   private var client: LPAdClient { LPAdClient.shared }
   /// 加密卡走 SecurityBleDevice。默认 true（覆盖面更广）；
   /// Dart 侧可通过 setSecureMode 切换，方便对比排查。
-  private var preferSecure = false
+  private var preferSecure = true
   /// 正在等用户输入卡密码：看门狗暂停计时，否则用户输得慢会被误判超时。
   private var pskPrompting = false
 
@@ -458,15 +458,13 @@ final class NativeLpaBridge: NSObject {
     self.log("getDeviceInfo returned after \(ms)ms, info=\(info == nil ? "nil" : "ok")")
 
     guard let info else {
-      self.log("getDeviceInfo returned nil (attempt \(attempt))")
-      if attempt < 3 {
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
-          self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
-        }
-      } else {
-        emit(["type": "valid", "valid": false])
-        done(false)
-      }
+      // 单次 getDeviceInfo 已经是 180s 超时，重试会放大到十几分钟，
+      // 没有意义。直接判定本次模式失败，由上层决定是否换模式。
+      self.log("getDeviceInfo returned nil -> card did not answer")
+      self.log("hint: if secure mode was on, the PSK is likely wrong; "
+               + "if off, this card needs the secure channel")
+      emit(["type": "valid", "valid": false])
+      done(false)
       return
     }
 
@@ -474,16 +472,8 @@ final class NativeLpaBridge: NSObject {
 
     let imei = info.imei
     guard !imei.isEmpty else {
-      self.log("empty imei on attempt \(attempt)")
-      if attempt < 3 {
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
-          self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
-        }
-      } else {
-        // Don't tear the link down here: the card may be read-only-ish but the
-        // user can still see profiles. Report failure instead of dropping it.
-        done(false)
-      }
+      self.log("empty imei -> treating as not ready")
+      done(false)
       return
     }
 

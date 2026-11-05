@@ -512,7 +512,9 @@ final class NativeLpaBridge: NSObject {
     var result: String?
 
     DispatchQueue.main.async { [weak self] in
-      guard self != nil else { group.leave(); return }
+      // 重新绑定成非可选类型：guard self != nil 不会改变类型，
+      // 之后的 self.log(...) 就会报 must be unwrapped。
+      guard let self else { group.leave(); return }
       let alert = UIAlertController(
         title: "输入加密密码",
         message: "这张卡需要密码才能建立安全通道，密码通常印在卡上。",

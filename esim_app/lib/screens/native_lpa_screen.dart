@@ -37,6 +37,8 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   List<NativeLpaProfile> _profiles = [];
   String? _message;
   double? _progress;
+  /// 仅表示"正在写卡"，与 _busy（任意进行中的操作）区分开。
+  bool _writing = false;
   bool _moreOpen = false;
 
   /// 原生层诊断日志，滚动展示在页面底部。
@@ -196,6 +198,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
 
     setState(() {
       _busy = true;
+      _writing = true;
       _progress = null;
       _message = '正在写卡，请勿断开读卡器…';
     });
@@ -635,12 +638,14 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   // ----- 步骤 3 -----
 
   Widget _step3Write() {
+    // 只反映"正在写卡"，不跟着"正在连接"一起转。
+    final writing = _writing;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton.icon(
           onPressed: (_busy || !_connected) ? null : _download,
-          icon: _busy
+          icon: writing
               ? const SizedBox(
                   width: 16,
                   height: 16,
@@ -650,7 +655,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                   ),
                 )
               : const Icon(Icons.download),
-          label: Text(_busy ? '写卡中…' : '开始写卡'),
+          label: Text(writing ? '写卡中…' : '开始写卡'),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: AppColors.border,

@@ -124,10 +124,18 @@ class NativeLpa {
     return _available!;
   }
 
-  /// Raw event stream: scan hits, connection changes, device notifications.
-  static Stream<Map<String, dynamic>> get rawEvents => _events
+  /// 全局共享的事件流。
+  ///
+  /// 必须只创建一次：EventChannel 在原生侧只有一个 eventSink 槽位，
+  /// 每多调用一次 receiveBroadcastStream() 就多一个监听者，
+  /// 后来者会顶掉前一个的 sink，先订阅的那条流从此收不到任何事件。
+  /// （表现：扫描能出设备，但连接日志/状态一条都没有。）
+  static final Stream<Map<String, dynamic>> _rawEvents = _events
       .receiveBroadcastStream()
       .map((e) => Map<String, dynamic>.from(e as Map));
+
+  /// Raw event stream: scan hits, connection changes, device notifications.
+  static Stream<Map<String, dynamic>> get rawEvents => _rawEvents;
 
   /// Discovered cards.
   static Stream<NativeLpaDevice> scan({

@@ -279,6 +279,7 @@ final class NativeLpaBridge: NSObject {
       guard let self else { return }
       self.discovered.removeAll()
       self.advertisedMac.removeAll()
+      self.log("scan: started (central.state=\(central.state.rawValue))")
       central.scanForPeripherals(withServices: nil, options: nil)
       self.resultQueue.async { result(nil) }
     }
@@ -307,14 +308,22 @@ final class NativeLpaBridge: NSObject {
   // MARK: - Connect
 
   private func connect(deviceId: String, result: @escaping FlutterResult) {
+    self.log("connect() requested for id=\(deviceId)")
+    self.log("connect(): queued on sdkQueue")
+
     sdkQueue.async { [weak self] in
       guard let self else { return }
+      self.log("connect(): sdkQueue acquired")
       guard let peripheral = self.discovered[deviceId] else {
+        self.log("connect(): device_not_found in discovered (have \(self.discovered.count))")
         self.reply(result, Self.error("device_not_found")); return
       }
+      self.log("connect(): peripheral=\(peripheral.name ?? "nil") state=\(peripheral.state.rawValue)")
       guard let central = self.central else {
+        self.log("connect(): bluetooth_unavailable")
         self.reply(result, Self.error("bluetooth_unavailable")); return
       }
+      self.log("connect(): central.state=\(central.state.rawValue) (5=poweredOn)")
 
       self.teardownConnectionSync()
 
@@ -418,9 +427,9 @@ final class NativeLpaBridge: NSObject {
         }
       }
 
+      self.log("connect(): calling device.reopen()")
       device.reopen()
-
-      self.log("reopen() called, waiting for state callback...")
+      self.log("connect(): reopen() returned, waiting for callbacks")
     }
   }
 
@@ -637,8 +646,14 @@ extension NativeLpaBridge: CBCentralManagerDelegate {
                       didDiscover peripheral: CBPeripheral,
                       advertisementData: [String: Any],
                       rssi RSSI: NSNumber) {
+    let advName = peripheral.name
+      ?? (advertisementData[CBAdvertisementDataLocalNameKey] as? String)
+      ?? "(no name)"
+    let hasSvc = LFCommonUtil.isHaveLFBleService(advertisementData: advertisementData)
+    self.log("scan: found \(advName) rssi=\(RSSI) LFservice=\(hasSvc)")
+
     // Accept only Linksfield-capable peripherals, same rule as the demo.
-    guard LFCommonUtil.isHaveLFBleService(advertisementData: advertisementData) else {
+    guard hasSvc else {
       return
     }
     let id = peripheral.identifier.uuidString

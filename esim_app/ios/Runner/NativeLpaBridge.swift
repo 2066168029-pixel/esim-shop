@@ -297,44 +297,87 @@ final class NativeLpaBridge: NSObject {
       device.connectStateCallback = { [weak self] state in
         guard let self else { return }
         self.emit(["type": "connect", "state": state.rawValue])
-        if state == .STATE_CONNECTED {
-          // Give the stack a moment to finish service discovery before
-          // asking for device info, mirroring the demo's flow.
-          self.sdkQueue.asyncAfter(deadline: .now() + 0.3) {
-            self.primeClient(done: done)
-          }
-        } else if state == .STATE_CONNECTFAIL {
+        NSLog("[NativeLpa] connect state -> %d", state.rawValue)
+        if state == .STATE_CONNECTFAIL {
+          NSLog("[NativeLpa] connect FAILED (stack reported failure)")
           done(false)
         } else if state == .STATE_DISCONNECTED {
+          NSLog("[NativeLpa] disconnected before ready")
           done(false)
         }
+        // STATE_CONNECTED only means the GATT link is up. Service discovery,
+        // CCCD subscription and MTU negotiation are still in flight, so we must
+        // NOT read device info here. isValidDeviceCallback fires once the SDK
+        // has finished all of that and the card actually answers.
       }
 
       device.isValidDeviceCallback = { [weak self] valid in
-        self?.emit(["type": "valid", "valid": valid])
+        guard let self else { return }
+        self.emit(["type": "valid", "valid": valid])
+        NSLog("[NativeLpa] isValidDevice -> %@", valid ? "true" : "false")
+        if valid {
+          self.sdkQueue.async { self.primeClient(done: done) }
+        } else {
+          // The SDK will also report CONNECTFAIL; keep the timeout as backstop.
+          NSLog("[NativeLpa] device reported invalid")
+        }
       }
 
       device.reopen()
 
-      // Safety net: don't hang Flutter forever if the callback never fires.
-      self.sdkQueue.asyncAfter(deadline: .now() + 25) { done(false) }
+      // Safety net: don't hang Flutter forever if no callback ever fires.
+      // 25s is generous: BLE connect + discovery + MTU on a slow card can take
+      // several seconds, but a dead reader should surface quickly.
+      self.sdkQueue.asyncAfter(deadline: .now() + 25) {
+        NSLog("[NativeLpa] connect timed out after 25s")
+        done(false)
+      }
     }
   }
 
   /// After BLE connect: read device info, then create the LPAd client.
-  private func primeClient(done: @escaping (Bool) -> Void) {
-    guard let device = bleDevice else { done(false); return }
-
-    let info = device.getDeviceInfo()
-    guard let info else {
-      emit(["type": "valid", "valid": false])
+  ///
+  /// getDeviceInfo() is a blocking request that can still come back empty on
+  /// the first try right after service discovery, so retry a couple of times
+  /// with a short backoff before giving up.
+  private func primeClient(done: @escaping (Bool) -> Void, attempt: Int = 1) {
+    guard let device = bleDevice else {
+      NSLog("[NativeLpa] primeClient: no bleDevice")
       done(false)
       return
     }
+
+    NSLog("[NativeLpa] getDeviceInfo attempt %d", attempt)
+    let info = device.getDeviceInfo()
+
+    guard let info else {
+      NSLog("[NativeLpa] getDeviceInfo returned nil (attempt %d)", attempt)
+      if attempt < 3 {
+        sdkQueue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+          self?.primeClient(done: done, attempt: attempt + 1)
+        }
+      } else {
+        emit(["type": "valid", "valid": false])
+        done(false)
+      }
+      return
+    }
+
+    NSLog("[NativeLpa] deviceInfo imei='%@' vendor='%@' sn='%@'",
+          info.imei, info.vendor, info.sn)
+
     let imei = info.imei
     guard !imei.isEmpty else {
-      device.close()
-      done(false)
+      NSLog("[NativeLpa] empty imei on attempt %d", attempt)
+      if attempt < 3 {
+        sdkQueue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+          self?.primeClient(done: done, attempt: attempt + 1)
+        }
+      } else {
+        // Don't tear the link down here: the card may be read-only-ish but the
+        // user can still see profiles. Report failure instead of dropping it.
+        done(false)
+      }
       return
     }
 

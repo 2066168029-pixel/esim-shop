@@ -45,6 +45,7 @@
 import Foundation
 import Flutter
 import CoreBluetooth
+import UIKit
 
 #if canImport(eSIMManagerSDK)
 import eSIMManagerSDK
@@ -372,17 +373,6 @@ final class NativeLpaBridge: NSObject {
         // has finished all of that and the card actually answers.
       }
 
-      // 加密卡会同步回调要密码。SDK 在 sdkQueue 上阻塞等待，
-      // 所以这里不能弹主线程 Dialog，必须先返回上次成功用过的密码
-      // （存在 UserDefaults 里），首次不知道就让 SDK 失败并在 Dart 侧提示输入。
-      LPAdClient.setUserAuthenticationCallback { [weak self] () -> String? in
-        guard let self else { return nil }
-        let psk = self.cachedPsk
-        NSLog("[NativeLpa] SDK asked for PSK -> %@",
-              psk.isEmpty ? "none stored, giving up" : "replying cached")
-        return psk.isEmpty ? nil : psk
-      }
-
       device.isValidDeviceCallback = { [weak self] valid in
         guard let self else { return }
         self.emit(["type": "valid", "valid": valid])
@@ -397,11 +387,13 @@ final class NativeLpaBridge: NSObject {
 
       device.reopen()
 
-      // Safety net: don't hang Flutter forever if no callback ever fires.
-      // 25s is generous: BLE connect + discovery + MTU on a slow card can take
-      // several seconds, but a dead reader should surface quickly.
-      self.sdkQueue.asyncAfter(deadline: .now() + 25) {
-        NSLog("[NativeLpa] connect timed out after 25s")
+      NSLog("[NativeLpa] reopen() called, waiting for state callback...")
+
+      // Safety net. MUST NOT run on sdkQueue: if the SDK is blocked inside one
+      // of its own blocking calls, a timer queued on the same serial queue can
+      // never fire and the Dart future hangs forever. Use a global queue.
+      DispatchQueue.global().asyncAfter(deadline: .now() + 20) {
+        NSLog("[NativeLpa] connect timed out after 20s (callbacks never fired)")
         done(false)
       }
     }
@@ -419,14 +411,27 @@ final class NativeLpaBridge: NSObject {
       return
     }
 
+    // Demo 的做法：密码回调必须在 getDeviceInfo() 之前注册。
+    // SDK 在它自己的线程上阻塞等待输入，主线程弹框后用 DispatchGroup 桥接回去。
+    LPAdClient.setUserAuthenticationCallback { [weak self] () -> String? in
+      guard let self else { return nil }
+      // 上次用过的密码优先，避免每次都问
+      if !self.cachedPsk.isEmpty {
+        NSLog("[NativeLpa] PSK: replying cached value")
+        return self.cachedPsk
+      }
+      NSLog("[NativeLpa] PSK: prompting on main thread")
+      return self.promptForPasswordBlocking()
+    }
+
     NSLog("[NativeLpa] getDeviceInfo attempt %d", attempt)
     let info = device.getDeviceInfo()
 
     guard let info else {
       NSLog("[NativeLpa] getDeviceInfo returned nil (attempt %d)", attempt)
       if attempt < 3 {
-        sdkQueue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-          self?.primeClient(done: done, attempt: attempt + 1)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
+          self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
         }
       } else {
         emit(["type": "valid", "valid": false])
@@ -442,8 +447,8 @@ final class NativeLpaBridge: NSObject {
     guard !imei.isEmpty else {
       NSLog("[NativeLpa] empty imei on attempt %d", attempt)
       if attempt < 3 {
-        sdkQueue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-          self?.primeClient(done: done, attempt: attempt + 1)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
+          self?.sdkQueue.async { self?.primeClient(done: done, attempt: attempt + 1) }
         }
       } else {
         // Don't tear the link down here: the card may be read-only-ish but the
@@ -468,6 +473,64 @@ final class NativeLpaBridge: NSObject {
       "deviceName": info.deviceName,
     ])
     done(true)
+  }
+
+  /// 主线程弹密码框，阻塞当前（SDK）线程直到用户输入或超时。
+  ///
+  /// 与 demo 的 inputSecurityPassword 等价：SDK 在它自己的队列上同步等待，
+  /// 这里用 DispatchGroup 把结果桥接回来。60 秒不输入就放弃，避免
+  /// sdkQueue 被永久占住（后续所有 SDK 调用都会排队）。
+  private func promptForPasswordBlocking() -> String? {
+    let group = DispatchGroup()
+    group.enter()
+    var result: String?
+
+    DispatchQueue.main.async { [weak self] in
+      guard self != nil else { group.leave(); return }
+      let alert = UIAlertController(
+        title: "输入加密密码",
+        message: "这张卡需要密码才能建立安全通道，密码通常印在卡上。",
+        preferredStyle: .alert)
+      alert.addTextField { tf in
+        tf.placeholder = "Password"
+        tf.autocorrectionType = .no
+        tf.autocapitalizationType = .none
+      }
+      alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
+        NSLog("[NativeLpa] PSK: user cancelled")
+        group.leave()
+      })
+      alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+        let v = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        NSLog("[NativeLpa] PSK: user entered %d chars", v.count)
+        result = v.isEmpty ? nil : v
+        group.leave()
+      })
+
+      // 找到最顶层 VC 来 present
+      guard let root = UIApplication.shared.connectedScenes
+              .compactMap({ $0 as? UIWindowScene })
+              .flatMap({ $0.windows })
+              .first(where: { $0.isKeyWindow })?.rootViewController else {
+        group.leave()
+        return
+      }
+      var top = root
+      while let p = top.presentedViewController { top = p }
+      top.present(alert, animated: true)
+    }
+
+    // 60 秒兜底：用户一直不理会就放弃，别把 SDK 队列卡死
+    let timeout = DispatchTime.now() + 60
+    if group.wait(timeout: timeout) == .timedOut {
+      NSLog("[NativeLpa] PSK: prompt timed out after 60s")
+      return nil
+    }
+    // 记住这次输入，下次直接复用
+    if let r = result, !r.isEmpty {
+      cachedPsk = r
+    }
+    return result
   }
 
   private func teardownConnectionSync() {

@@ -1,8 +1,11 @@
 ﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../api.dart';
 import '../native_lpa.dart';
+import '../store.dart';
 import '../theme.dart';
 import 'scan_screen.dart';
 
@@ -41,10 +44,9 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   bool _writing = false;
   bool _moreOpen = false;
 
-  /// 原生层诊断日志，滚动展示在页面底部。
-  final List<String> _logs = [];
-  StreamSubscription<String>? _logSub;
-  bool _moreOpenLog = false;
+  /// 服务端额度（写入配额）。来自 /api/sim/bind-card。
+  /// 与安卓 card_writer_screen_v3 的 _quota 保持一致。
+  CardQuota? _quota;
 
   final _codeController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -56,13 +58,6 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   void initState() {
     super.initState();
     _checkAvailability();
-    _logSub = NativeLpa.logs.listen((line) {
-      if (!mounted) return;
-      setState(() {
-        _logs.add(line);
-        if (_logs.length > 200) _logs.removeAt(0);
-      });
-    });
   }
 
   @override
@@ -70,7 +65,6 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
     _scanSub?.cancel();
     _stateSub?.cancel();
     _notifySub?.cancel();
-    _logSub?.cancel();
     NativeLpa.stopScan().catchError((Object _) {});
     _codeController.dispose();
     _confirmController.dispose();
@@ -178,10 +172,57 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       setState(() {
         _profiles = r.profiles;
         _message = null;
-      });    } catch (e) {
+      });
+
+      // 与安卓一致：先把卡上的 profile 列表推给服务端同步，
+      // 再查额度。服务端按已绑定数量算配额，不同步的话基数会偏小。
+      await _loadQuota(eid);
+    } catch (e) {
       if (mounted) setState(() => _message = '读取卡片信息失败：$e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 查询这张卡的服务端写入配额。
+  ///
+  /// 与安卓 card_writer_screen_v3 的流程一致：
+  ///   1. syncProfiles —— 把卡上实际存在的 profile 推上去，校正服务端基数
+  ///   2. bindCard     —— 拿回 capacity / boundCount / allowed
+  ///
+  /// 网络失败不视为"禁止写入"：额度是运营控制项，不该因为断网把功能锁死。
+  Future<void> _loadQuota(String eid) async {
+    final app = context.read<AppState>();
+    try {
+      if (_profiles.isNotEmpty) {
+        await app.api.syncProfiles(
+          eid,
+          _profiles
+              .map((x) => {
+                    'iccid': x.iccid,
+                    'state': x.state,
+                    'nickname': x.nickname,
+                    'profile_name': x.profileName,
+                    'service_provider': x.serviceProviderName,
+                  })
+              .toList(),
+        );
+      }
+    } catch (_) {
+      // 同步失败不阻断额度查询
+    }
+
+    try {
+      final q = await app.api.bindCard(eid);
+      if (!mounted) return;
+      setState(() => _quota = q);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _quota = null);
+      // 保留原有提示，不覆盖成功消息
+      if (_message == null) {
+        setState(() => _message = '额度查询失败：$e');
+      }
     }
   }
 
@@ -446,8 +487,6 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
           _messageCard(),
         ],
         const SizedBox(height: 18),
-        _logSection(),
-        const SizedBox(height: 12),
         _moreSection(),
       ],
     );
@@ -695,70 +734,6 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
 
   // ----- 更多功能 -----
 
-  /// 诊断日志面板：连接失败时用户可以直接截图给我。
-  Widget _logSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => setState(() => _moreOpenLog = !_moreOpenLog),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  const Icon(Icons.terminal, size: 18, color: AppColors.muted),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '连接日志',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _logs.isEmpty ? '暂无' : '${_logs.length} 条 · 点开查看',
-                      style: const TextStyle(fontSize: 12, color: AppColors.muted),
-                    ),
-                  ),
-                  Icon(
-                    _moreOpenLog ? Icons.expand_less : Icons.expand_more,
-                    color: AppColors.muted,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_moreOpenLog) ...[
-            const Divider(height: 1),
-            Container(
-              height: 240,
-              width: double.infinity,
-              color: const Color(0xFF1E1E1E),
-              padding: const EdgeInsets.all(10),
-              child: SingleChildScrollView(
-                reverse: true,
-                child: SelectableText(
-                  _logs.isEmpty ? '（还没有日志）' : _logs.join('\n'),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    height: 1.45,
-                    fontFamily: 'Menlo',
-                    color: Color(0xFFB0F0B0),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _moreSection() {
     return Container(
       decoration: BoxDecoration(
@@ -812,6 +787,7 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
                   children: [
                     _kv('设备', _selected?.name ?? '-'),
                     _kv('EID', _eid ?? '-'),
+                    if (_quota != null) _quotaRow(),
                   ],
                 ),
               ),
@@ -851,6 +827,89 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
       ),
     );
   }
+
+  /// 服务端写入配额。与安卓 card_writer_screen_v3 的额度行一致：
+  /// 已绑定 / 容量，超额红色，并给出扩容入口。
+  Widget _quotaRow() {
+    final q = _quota!;
+    final text = q.known ? '${q.boundCount} / ${q.capacity}' : q.reasonText;
+    final color = !q.known
+        ? AppColors.muted
+        : (q.allowed ? const Color(0xFF389E0D) : const Color(0xFFCF1322));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 66,
+            child: Text(
+              '写入额度',
+              style: TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+                color: color,
+              ),
+            ),
+          ),
+          if (q.known)
+            InkWell(
+              onTap: _buyQuota,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  '扩容',
+                  style: TextStyle(fontSize: 12, color: AppColors.primary),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 扩容：额度不足时跳去购买套餐。
+  ///
+  /// 安卓那边是有额度包可直接下单；iOS 这版先引导到套餐页，
+  /// 复用已有的下单/支付链路，避免再写一套。
+  void _buyQuota() {
+    final q = _quota;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('扩容'),
+        content: Text(
+          q == null || !q.known
+              ? '当前额度状态未知，请刷新后重试。'
+              : '当前已用 ${q.boundCount} / ${q.capacity}。\n'
+                  '去套餐页购买额度包，支付后返回本页点「刷新 profile」即可生效。',
+          style: const TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.maybePop(context);
+            },
+            child: const Text('去套餐页'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   Widget _profileTile(NativeLpaProfile p) {
     final active = p.state == 1;

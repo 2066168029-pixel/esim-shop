@@ -300,10 +300,14 @@ final class NativeLpaBridge: NSObject {
         body(c)
       }
       if self.central == nil {
-        // Delegate callbacks arrive on this same queue (queue: nil => main by
-        // default, so pass sdkQueue explicitly to stay off the main thread).
+        // 必须用主队列（queue: nil），与 demo 完全一致。
+        //
+        // CBCentralManager 把回调派发到创建时指定的 queue。
+        // 如果传 sdkQueue，而 getDeviceInfo() 又正是在 sdkQueue 上同步
+        // 阻塞等回调，回调就会排在这个队列里永远轮不到执行 —— 自锁。
+        // 表现：连接成功、isValidDevice=true、getDeviceInfo 卡满 180s。
         self.central = CBCentralManager(
-          delegate: self, queue: self.sdkQueue,
+          delegate: self, queue: nil,
           options: [CBCentralManagerOptionShowPowerAlertKey: false])
       }
     }

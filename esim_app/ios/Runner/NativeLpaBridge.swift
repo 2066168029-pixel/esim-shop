@@ -65,9 +65,11 @@ final class NativeLpaBridge: NSObject {
 
   // MARK: - BLE state
 
+  /// 扫描专用：delegate = self。
   private var central: CBCentralManager?
   private var centralReady = false
   private var centralWaiters: [() -> Void] = []
+
 
   /// deviceId (CBPeripheral.identifier.uuidString) -> peripheral
   private var discovered: [String: CBPeripheral] = [:]
@@ -279,7 +281,9 @@ final class NativeLpaBridge: NSObject {
       guard let self else { return }
       self.discovered.removeAll()
       self.advertisedMac.removeAll()
-      self.log("scan: started (central.state=\(central.state.rawValue))")
+      // 若上一次连接没走 disconnect，delegate 可能还在 SDK 手里
+      self.reclaimCentralDelegate()
+      self.log("scan: started (central.state=\(central.state.rawValue), delegate=\(central.delegate === self ? "self" : "other"))")
       central.scanForPeripherals(withServices: nil, options: nil)
       self.resultQueue.async { result(nil) }
     }
@@ -319,10 +323,15 @@ final class NativeLpaBridge: NSObject {
         self.reply(result, Self.error("device_not_found")); return
       }
       self.log("connect(): peripheral=\(peripheral.name ?? "nil") state=\(peripheral.state.rawValue)")
+
+      // 与 demo 完全一致：把扫描用的这个 central 直接交给 SDK。
+      // EuiccBleDevice 内部会 setDelegate(self) 接管它，
+      // 之后 GATT 回调由 SDK 处理（这正是 demo 分两个 VC 的原因）。
       guard let central = self.central else {
         self.log("connect(): bluetooth_unavailable")
         self.reply(result, Self.error("bluetooth_unavailable")); return
       }
+      self.log("connect(): handing scan central to SDK (delegate will be taken over)")
       self.log("connect(): central.state=\(central.state.rawValue) (5=poweredOn)")
 
       self.teardownConnectionSync()
@@ -564,12 +573,26 @@ final class NativeLpaBridge: NSObject {
     bleDevice?.close()
     bleDevice = nil
     connectedPeripheral = nil
+    reclaimCentralDelegate()
   }
 
   private func disconnect() {
     sdkQueue.async { [weak self] in
-      self?.teardownConnectionSync()
-      self?.emit(["type": "connect", "state": DeviceConnectionState.STATE_DISCONNECTED.rawValue])
+      guard let self else { return }
+      self.teardownConnectionSync()
+      // SDK 在连接期间抢走了 central 的 delegate（EuiccBleDevice 自己实现
+      // CBCentralManagerDelegate）。断开后必须还回来，否则扫描收不到广播。
+      self.reclaimCentralDelegate()
+      self.emit(["type": "connect", "state": DeviceConnectionState.STATE_DISCONNECTED.rawValue])
+    }
+  }
+
+  /// 把 central 的 delegate 从 SDK 手里拿回来给扫描用。
+  private func reclaimCentralDelegate() {
+    guard let c = central else { return }
+    if c.delegate !== self {
+      c.delegate = self
+      self.log("central delegate reclaimed for scanning")
     }
   }
 

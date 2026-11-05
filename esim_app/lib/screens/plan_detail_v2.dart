@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../i18n.dart';
 import '../main.dart' show showSnack;
 import 'cart_screen.dart';
+import 'login_screen.dart';
 
 /// 商品详情页 —— 套餐信息 + 加入购物车。
 ///
@@ -398,6 +399,36 @@ class _PlanDetailScreenV2State extends State<PlanDetailScreenV2> {
   // ---------------------------------------------------------------- logic
 
   Future<void> _addToCart(AppState app) async {
+    // 没登录不让买：订单要挂在账号上，加进购物车后结算也过不了。
+    if (!app.isLoggedIn) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
+          title: Text(app.t.signInToBuy, textAlign: TextAlign.center),
+          content: Text(app.t.signInRequired, textAlign: TextAlign.center),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(app.t.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(app.t.logIn),
+            ),
+          ],
+        ),
+      );
+      if (go == true && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+
     setState(() => _adding = true);
     HapticFeedback.lightImpact();
     try {

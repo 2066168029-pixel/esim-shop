@@ -346,4 +346,36 @@ class L {
   // ---- plan card ----
   String get view => _t({AppLang.en: 'View', AppLang.zh: '查看', AppLang.ja: '詳細', AppLang.ko: '보기', AppLang.th: 'ดู', AppLang.vi: 'Xem'});
   String get addToCartShort => _t({AppLang.en: 'Add to cart', AppLang.zh: '加入购物车', AppLang.ja: 'カートに入れる', AppLang.ko: '장바구니에 담기', AppLang.th: 'เพิ่มลงตะกร้า', AppLang.vi: 'Thêm vào giỏ'});
+
+  // ---- auth: login / register ----
+  String get signUp => _t({AppLang.en: 'Sign Up', AppLang.zh: '注册', AppLang.ja: '新規登録', AppLang.ko: '회원가입', AppLang.th: 'สมัครสมาชิก', AppLang.vi: 'Đăng ký'});
+  String get registerAndSignIn => _t({AppLang.en: 'Sign up and sign in', AppLang.zh: '注册并登录', AppLang.ja: '登録してログイン', AppLang.ko: '가입 후 로그인', AppLang.th: 'สมัครและเข้าสู่ระบบ', AppLang.vi: 'Đăng ký và đăng nhập'});
+  String get passwordLabel => _t({AppLang.en: 'Password', AppLang.zh: '密码', AppLang.ja: 'パスワード', AppLang.ko: '비밀번호', AppLang.th: 'รหัสผ่าน', AppLang.vi: 'Mật khẩu'});
+  String get nicknameLabel => _t({AppLang.en: 'Nickname', AppLang.zh: '昵称', AppLang.ja: 'ニックネーム', AppLang.ko: '닉네임', AppLang.th: 'ชื่อเล่น', AppLang.vi: 'Biệt danh'});
+  String get emailCodeLabel => _t({AppLang.en: 'Email code', AppLang.zh: '邮箱验证码', AppLang.ja: 'メール認証コード', AppLang.ko: '이메일 인증번호', AppLang.th: 'รหัสยืนยันทางอีเมล', AppLang.vi: 'Mã xác minh email'});
+  String get emailCodeHint => _t({AppLang.en: '6-digit code', AppLang.zh: '6 位验证码', AppLang.ja: '6桁のコード', AppLang.ko: '6자리 인증번호', AppLang.th: 'รหัส 6 หลัก', AppLang.vi: 'Mã 6 chữ số'});
+  String get getCode => _t({AppLang.en: 'Get code', AppLang.zh: '获取验证码', AppLang.ja: 'コードを取得', AppLang.ko: '인증번호 받기', AppLang.th: 'รับรหัส', AppLang.vi: 'Lấy mã'});
+  String get codeSentHint => _t({AppLang.en: 'The code is sent to the email above and is valid for 10 minutes', AppLang.zh: '验证码会发送到上面的邮箱，10 分钟内有效', AppLang.ja: 'コードは上記のメールに届きます。有効期限は10分です', AppLang.ko: '인증번호는 위 이메일로 발송되며 10분간 유효합니다', AppLang.th: 'รหัสจะถูกส่งไปยังอีเมลด้านบน ใช้ได้ภายใน 10 นาที', AppLang.vi: 'Mã được gửi tới email trên và có hiệu lực 10 phút'});
+  String get forgotPassword => _t({AppLang.en: 'Forgot password?', AppLang.zh: '忘记密码？', AppLang.ja: 'パスワードをお忘れですか？', AppLang.ko: '비밀번호를 잊으셨나요?', AppLang.th: 'ลืมรหัสผ่าน?', AppLang.vi: 'Quên mật khẩu?'});
+  String get haveAccountGoSignIn => _t({AppLang.en: 'Already have an account? Sign in', AppLang.zh: '已有账号？去登录', AppLang.ja: 'アカウントをお持ちですか？ログイン', AppLang.ko: '이미 계정이 있으신가요? 로그인', AppLang.th: 'มีบัญชีแล้ว? เข้าสู่ระบบ', AppLang.vi: 'Đã có tài khoản? Đăng nhập'});
+  String get noAccountGoSignUp => _t({AppLang.en: 'No account yet? Sign up', AppLang.zh: '没有账号？去注册', AppLang.ja: 'アカウントをお持ちでない方は新規登録', AppLang.ko: '계정이 없으신가요? 회원가입', AppLang.th: 'ยังไม่มีบัญชี? สมัครสมาชิก', AppLang.vi: 'Chưa có tài khoản? Đăng ký'});
+
+  // ---- auth: reset password ----
+  String get resetPassword => _t({AppLang.en: 'Reset password', AppLang.zh: '重置密码', AppLang.ja: 'パスワードを再設定', AppLang.ko: '비밀번호 재설정', AppLang.th: 'รีเซ็ตรหัสผ่าน', AppLang.vi: 'Đặt lại mật khẩu'});
+  String get newPasswordLabel => _t({AppLang.en: 'New password (min 6 characters)', AppLang.zh: '新密码（至少 6 位）', AppLang.ja: '新しいパスワード（6文字以上）', AppLang.ko: '새 비밀번호 (6자 이상)', AppLang.th: 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)', AppLang.vi: 'Mật khẩu mới (tối thiểu 6 ký tự)'});
+  String get resetPasswordIntro => _t({AppLang.en: 'Enter your registered email, get a code, then set a new password.', AppLang.zh: '填写注册邮箱，获取验证码后设置新密码。', AppLang.ja: '登録メールを入力し、コードを受け取って新しいパスワードを設定します。', AppLang.ko: '가입한 이메일을 입력하고 인증번호를 받은 뒤 새 비밀번호를 설정하세요.', AppLang.th: 'กรอกอีเมลที่ลงทะเบียน รับรหัส แล้วตั้งรหัสผ่านใหม่', AppLang.vi: 'Nhập email đã đăng ký, nhận mã rồi đặt mật khẩu mới.'});
+
+  // ---- auth: validation / feedback ----
+  String get errInvalidEmail => _t({AppLang.en: 'Please enter a valid email address', AppLang.zh: '请填写正确的邮箱地址', AppLang.ja: '正しいメールアドレスを入力してください', AppLang.ko: '올바른 이메일 주소를 입력하세요', AppLang.th: 'กรุณากรอกอีเมลที่ถูกต้อง', AppLang.vi: 'Vui lòng nhập địa chỉ email hợp lệ'});
+  String get errPasswordTooShort => _t({AppLang.en: 'Password must be at least 6 characters', AppLang.zh: '密码至少 6 位', AppLang.ja: 'パスワードは6文字以上必要です', AppLang.ko: '비밀번호는 6자 이상이어야 합니다', AppLang.th: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัว', AppLang.vi: 'Mật khẩu phải có ít nhất 6 ký tự'});
+  String get errCodeRequired => _t({AppLang.en: 'Please enter the email code', AppLang.zh: '请输入邮箱验证码', AppLang.ja: 'メール認証コードを入力してください', AppLang.ko: '이메일 인증번호를 입력하세요', AppLang.th: 'กรุณากรอกรหัสยืนยันทางอีเมล', AppLang.vi: 'Vui lòng nhập mã xác minh email'});
+  String codeSentTo(String email) => _t({AppLang.en: 'Code sent to $email, check your inbox', AppLang.zh: '验证码已发送至 $email，请查收', AppLang.ja: '$email にコードを送信しました', AppLang.ko: '$email 로 인증번호를 보냈습니다', AppLang.th: 'ส่งรหัสไปที่ $email แล้ว', AppLang.vi: 'Đã gửi mã tới $email'});
+  String get resetSuccess => _t({AppLang.en: 'Password reset. Sign in with the new password.', AppLang.zh: '密码已重置，请用新密码登录', AppLang.ja: 'パスワードを再設定しました。新しいパスワードでログインしてください', AppLang.ko: '비밀번호가 재설정되었습니다. 새 비밀번호로 로그인하세요', AppLang.th: 'รีเซ็ตรหัสผ่านแล้ว กรุณาเข้าสู่ระบบด้วยรหัสใหม่', AppLang.vi: 'Đã đặt lại mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.'});
+  String get signInSuccess => _t({AppLang.en: 'Signed in', AppLang.zh: '登录成功', AppLang.ja: 'ログインしました', AppLang.ko: '로그인되었습니다', AppLang.th: 'เข้าสู่ระบบแล้ว', AppLang.vi: 'Đã đăng nhập'});
+
+  // ---- login gating ----
+  String get signInRequired => _t({AppLang.en: 'Please sign in to continue', AppLang.zh: '请先登录后继续', AppLang.ja: '続行するにはログインしてください', AppLang.ko: '계속하려면 로그인하세요', AppLang.th: 'กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ', AppLang.vi: 'Vui lòng đăng nhập để tiếp tục'});
+  String get tapToSignIn => _t({AppLang.en: 'Tap to sign in', AppLang.zh: '点击登录', AppLang.ja: 'タップしてログイン', AppLang.ko: '탭하여 로그인', AppLang.th: 'แตะเพื่อเข้าสู่ระบบ', AppLang.vi: 'Chạm để đăng nhập'});
+  String get signInToActivate => _t({AppLang.en: 'Sign in to use activation features', AppLang.zh: '登录后才能使用激活功能', AppLang.ja: 'ログインするとアクティベート機能が使えます', AppLang.ko: '로그인 후 활성화 기능을 사용할 수 있습니다', AppLang.th: 'เข้าสู่ระบบเพื่อใช้ฟีเจอร์การเปิดใช้งาน', AppLang.vi: 'Dang nhập để dùng tính năng kích hoạt'});
+  String get signInToBuy => _t({AppLang.en: 'Sign in to buy a SIM', AppLang.zh: '登录后才能购买 SIM 卡', AppLang.ja: 'ログインするとSIMカードを購入できます', AppLang.ko: '로그인 후 SIM 카드를 구매할 수 있습니다', AppLang.th: 'เข้าสู่ระบบเพื่อซื้อ SIM', AppLang.vi: 'Đăng nhập để mua SIM'});
 }

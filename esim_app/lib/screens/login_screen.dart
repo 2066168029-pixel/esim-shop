@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -27,6 +28,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _sending = false;
   int _countdown = 0;
   Timer? _timer;
+
+  /// Local accessor: keeps the build methods readable.
+  L get t => context.read<AppState>().t;
 
   @override
   void dispose() {
@@ -58,12 +62,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Future<void> _send() async {
     final email = _email.text.trim();
-    if (email.isEmpty || !email.contains('@')) return _toast('请先填写正确的邮箱地址');
+    if (email.isEmpty || !email.contains('@')) return _toast(t.errInvalidEmail);
     final app = context.read<AppState>();
     setState(() => _sending = true);
     try {
       await app.sendCode(email, purpose: 'reset');
-      _toast('重置验证码已发送至 $email，请查收', ok: true);
+      _toast(t.codeSentTo(email), ok: true);
       _startCountdown(60);
     } catch (e) {
       _toast(e.toString().replaceFirst('Exception: ', ''));
@@ -74,16 +78,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Future<void> _submit() async {
     final email = _email.text.trim();
-    if (email.isEmpty || !email.contains('@')) return _toast('请填写正确的邮箱地址');
-    if (_code.text.trim().isEmpty) return _toast('请输入邮箱验证码');
-    if (_password.text.length < 6) return _toast('新密码至少 6 位');
+    if (email.isEmpty || !email.contains('@')) return _toast(t.errInvalidEmail);
+    if (_code.text.trim().isEmpty) return _toast(t.errCodeRequired);
+    if (_password.text.length < 6) return _toast(t.errPasswordTooShort);
     final app = context.read<AppState>();
     setState(() => _busy = true);
     try {
       await app.resetPassword(email, _code.text.trim(), _password.text);
       if (!mounted) return;
       Navigator.pop(context);
-      _toast('密码已重置，请用新密码登录', ok: true);
+      _toast(t.resetSuccess, ok: true);
     } catch (e) {
       _toast(e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -94,19 +98,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('重置密码')),
+      appBar: AppBar(title: Text(context.read<AppState>().t.resetPassword)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           const SizedBox(height: 8),
-          const Text('填写注册邮箱，获取验证码后设置新密码。',
+          Text(t.resetPasswordIntro,
               style: TextStyle(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 20),
           TextField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
-            decoration: const InputDecoration(labelText: '邮箱'),
+            decoration: InputDecoration(labelText: t.emailLabel),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -118,8 +122,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z]')),
             ],
             decoration: InputDecoration(
-              labelText: '邮箱验证码',
-              hintText: '6 位验证码',
+              labelText: t.emailCodeLabel,
+              hintText: t.emailCodeHint,
               prefixIcon: const Icon(Icons.mark_email_read_outlined,
                   size: 20, color: AppColors.muted),
               suffixIcon: Padding(
@@ -136,7 +140,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           width: 15,
                           height: 15,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_countdown > 0 ? '${_countdown}s' : '获取验证码',
+                      : Text(_countdown > 0 ? '${_countdown}s' : t.getCode,
                           style: const TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w700)),
                 ),
@@ -144,22 +148,22 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '验证码会发送到上面的邮箱，10 分钟内有效',
+          Text(
+            t.codeSentHint,
             style: TextStyle(fontSize: 11, color: AppColors.muted),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _password,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '新密码（至少 6 位）'),
+            decoration: InputDecoration(labelText: t.newPasswordLabel),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _busy ? null : _submit,
             child: _busy
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('重置密码'),
+                : Text(t.resetPassword),
           ),
         ],
       ),
@@ -188,6 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _register = false;
   bool _busy = false;
+
+  /// Local accessor: keeps the build methods readable.
+  L get t => context.read<AppState>().t;
 
   /// Set when the backend answers 404/405 to /api/auth/send-code, which means
   /// this deployment predates email verification. Registration then falls back
@@ -241,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendCode() async {
     final email = _email.text.trim();
     if (email.isEmpty || !email.contains('@')) {
-      _toast('请先填写正确的邮箱地址');
+      _toast(t.errInvalidEmail);
       return;
     }
 
@@ -249,13 +256,13 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _sendingCode = true);
     try {
       await app.sendCode(email, purpose: 'register');
-      _toast('验证码已发送至 $email，请查收（含垃圾邮件箱）', ok: true);
+      _toast(t.codeSentTo(email), ok: true);
       _startCountdown(60);
     } catch (e) {
       if (_looksUnsupported(e)) {
         if (!mounted) return;
         setState(() => _codeUnsupported = true);
-        _toast('当前服务器未启用邮箱验证，可直接注册');
+        _toast(t.codeSentHint);
       } else {
         // The server's own wording already includes the wait time.
         _toast(_cleanError(e));
@@ -291,15 +298,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (_register) {
       if (email.isEmpty || !email.contains('@')) {
-        _toast('请填写正确的邮箱地址');
+        _toast(t.errInvalidEmail);
         return;
       }
       if (_password.text.length < 6) {
-        _toast('密码至少 6 位');
+        _toast(t.errPasswordTooShort);
         return;
       }
       if (!_codeUnsupported && _code.text.trim().isEmpty) {
-        _toast('请输入邮箱验证码');
+        _toast(t.errCodeRequired);
         return;
       }
     }
@@ -323,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (!mounted) return;
       Navigator.pop(context);
-      _toast('登录成功', ok: true);
+      _toast(t.signInSuccess, ok: true);
     } catch (e) {
       _toast(_cleanError(e));
     } finally {
@@ -352,7 +359,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_register ? '注册' : '登录')),
+      appBar: AppBar(title: Text(_register ? t.signUp : t.logIn)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -367,14 +374,14 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
-            decoration: const InputDecoration(labelText: '邮箱'),
+            decoration: InputDecoration(labelText: t.emailLabel),
           ),
           const SizedBox(height: 12),
 
           if (_register) ...[
             TextField(
               controller: _name,
-              decoration: const InputDecoration(labelText: '昵称'),
+              decoration: InputDecoration(labelText: t.nicknameLabel),
             ),
             const SizedBox(height: 12),
           ],
@@ -382,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
           TextField(
             controller: _password,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '密码'),
+            decoration: InputDecoration(labelText: t.passwordLabel),
           ),
 
           // ---- verification code row (register only) ----
@@ -400,8 +407,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z]')),
               ],
               decoration: InputDecoration(
-                labelText: '邮箱验证码',
-                hintText: '6 位验证码',
+                labelText: t.emailCodeLabel,
+                hintText: t.emailCodeHint,
                 prefixIcon: const Icon(Icons.mark_email_read_outlined,
                     size: 20, color: AppColors.muted),
                 suffixIcon: Padding(
@@ -422,7 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(
-                            _countdown > 0 ? '${_countdown}s' : '获取验证码',
+                            _countdown > 0 ? '${_countdown}s' : t.getCode,
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w700),
                           ),
@@ -431,8 +438,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              '验证码会发送到上面的邮箱，10 分钟内有效',
+            Text(
+              t.codeSentHint,
               style: TextStyle(fontSize: 11, color: AppColors.muted),
             ),
           ],
@@ -465,21 +472,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : Text(_register ? '注册并登录' : '登录'),
+                : Text(_register ? t.registerAndSignIn : t.logIn),
           ),
           if (!_register) ...[
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: _busy ? null : () => _openReset(),
-                child: const Text('忘记密码？', style: TextStyle(fontSize: 13)),
+                child: Text(t.forgotPassword, style: const TextStyle(fontSize: 13)),
               ),
             ),
           ],
           const SizedBox(height: 10),
           TextButton(
             onPressed: _busy ? null : _toggleMode,
-            child: Text(_register ? '已有账号？去登录' : '没有账号？去注册'),
+            child: Text(_register ? t.haveAccountGoSignIn : t.noAccountGoSignUp),
           ),
         ],
       ),

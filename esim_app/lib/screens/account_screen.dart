@@ -260,13 +260,25 @@ class _AccountScreenState extends State<AccountScreen> {
                 _actionCard(context, Icons.account_balance_wallet_rounded, t.payment, AppColors.success,
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentPage()))),
                 const SizedBox(width: 10),
-                _actionCard(context, Icons.replay_rounded, t.rechargeRecords, AppColors.warn,
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRechargesScreen()))),
+                _actionCard(context, Icons.replay_rounded, t.rechargeRecords, AppColors.warn, () async {
+                  if (!app.isLoggedIn) {
+                    await _requireSignIn(context, t);
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRechargesScreen()));
+                }),
               ]),
               const SizedBox(height: 10),
               Row(children: [
-                _actionCard(context, Icons.card_giftcard_rounded, t.inviteFriends, AppColors.orange,
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InviteScreen()))),
+                _actionCard(context, Icons.card_giftcard_rounded, t.inviteFriends, AppColors.orange, () async {
+                  if (!app.isLoggedIn) {
+                    await _requireSignIn(context, t);
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const InviteScreen()));
+                }),
                 const SizedBox(width: 10),
                 _actionCard(context, Icons.headset_mic_rounded, t.helpCenter, const Color(0xFF0EA5E9),
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen()))),
@@ -574,4 +586,38 @@ Future<void> showChangePasswordSheet(BuildContext context) async {
   current.dispose();
   next.dispose();
   again.dispose();
+}
+
+/// 未登录时弹窗引导去登录。返回 true 表示已登录可继续。
+///
+/// 用在「邀请好友」「充值记录」这类需要账号数据的功能上：以前直接进页面，
+/// 页面里请求接口拿 401，界面上显示成"连接失败"，既误导又难看。
+Future<bool> _requireSignIn(BuildContext context, L t) async {
+  final app = context.read<AppState>();
+  if (app.isLoggedIn) return true;
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      icon: const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
+      title: Text(t.signInRequired, textAlign: TextAlign.center),
+      content: Text(t.tapToSignIn, textAlign: TextAlign.center),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(t.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(t.logIn),
+        ),
+      ],
+    ),
+  );
+  if (go != true || !context.mounted) return false;
+  await Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginScreen()),
+  );
+  return false;
 }

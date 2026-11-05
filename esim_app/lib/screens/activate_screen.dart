@@ -14,6 +14,7 @@ import 'card_writer_screen_v3.dart';
 import 'native_lpa_screen.dart';
 import 'scan_screen.dart';
 import '../main.dart' show showSnack;
+import 'login_screen.dart';
 
 class ActivateScreen extends StatefulWidget {
   const ActivateScreen({super.key});
@@ -151,6 +152,81 @@ class _ActivateScreenState extends State<ActivateScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final t = app.t;
+
+    // 激活的一切功能都要账号（写卡记录、绑定关系、后续查询都挂在账号上），
+    // 未登录直接挡在这里，而不是让用户填完激活码才失败。
+    if (!app.isLoggedIn) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Container(
+          decoration: const BoxDecoration(gradient: AppColors.skyBackground),
+          child: SafeArea(
+            child: Column(
+              children: [
+                const TopBar(),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 84,
+                            height: 84,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.10),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.sim_card_outlined,
+                                size: 40, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            t.signInToActivate,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            t.signInRequired,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 12.5, color: AppColors.muted, height: 1.6),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const LoginScreen()),
+                              ),
+                              child: Text(t.logIn,
+                                  style: const TextStyle(
+                                      fontSize: 15, fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Container(

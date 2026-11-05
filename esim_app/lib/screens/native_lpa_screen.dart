@@ -1,9 +1,10 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../native_lpa.dart';
 import '../theme.dart';
+import 'scan_screen.dart';
 
 /// iOS 写卡页，走 Linksfield eSIMManagerSDK（原生 Swift 二进制）。
 ///
@@ -557,10 +558,11 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   }
 
   Future<void> _scanQr() async {
-    // 复用 CardWriterScreenV2 里的扫码页
+    // 复用项目里现有的真扫码页（flutter_zxing，带摄像头）。
+    // 它会把 LPA: 开头的串原样返回。
     final code = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (_) => const NativeLpaQrPage()),
+      MaterialPageRoute(builder: (_) => const ScanScreen()),
     );
     if (code != null && code.isNotEmpty && mounted) {
       setState(() => _codeController.text = code.trim());
@@ -920,70 +922,3 @@ class _NativeLpaScreenState extends State<NativeLpaScreen> {
   }
 }
 
-/// 简单的扫码页（只在 iOS 写卡流程里用）。
-///
-/// 直接用 CardWriterScreenV2 内嵌的扫码页会引入整条 Dart 传输链路的依赖，
-/// 这里只做「拍照/选图 -> 返回字符串」，与写卡通道无关。
-class NativeLpaQrPage extends StatefulWidget {
-  const NativeLpaQrPage({super.key});
-
-  @override
-  State<NativeLpaQrPage> createState() => _NativeLpaQrPageState();
-}
-
-class _NativeLpaQrPageState extends State<NativeLpaQrPage> {
-  final _ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('激活码'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.text,
-        elevation: 0.5,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              '扫描卡片上的二维码，或手动粘贴完整 LPA 串。',
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _ctrl,
-              maxLines: 4,
-              minLines: 3,
-              autofocus: true,
-              style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-              decoration: const InputDecoration(
-                labelText: 'LPA 激活码',
-                hintText: r'LPA:1$SMDP.EXAMPLE.COM$MATCHING-ID',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () {
-                final v = _ctrl.text.trim();
-                if (v.isEmpty) return;
-                Navigator.pop(context, v);
-              },
-              child: const Text('确认'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

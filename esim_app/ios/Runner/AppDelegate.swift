@@ -29,11 +29,13 @@ import UIKit
     #endif
 
     // 支付宝：付款完成后由系统把 App 拉回前台，open url 在这里接住。
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AlipayBridge") {
-      let bridge = AlipayBridge(messenger: registrar.messenger())
-      bridge.registerAsShared()
-      alipayBridge = bridge
-    }
+    //
+    // 不用 registrar(forPlugin:) —— 那要求这个类实现 FlutterPlugin，
+    // 否则返回 nil，通道就永远注册不上。直接拿发动机的 messenger 更直接。
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    let bridge = AlipayBridge(messenger: messenger)
+    bridge.registerAsShared()
+    alipayBridge = bridge
   }
 
   /// 支付宝付完会用自己的 scheme 跳回来，必须在这里接住并把结果交还 SDK。

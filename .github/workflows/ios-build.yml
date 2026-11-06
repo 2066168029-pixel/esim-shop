@@ -165,6 +165,18 @@ jobs:
           fi
           echo "Vendored SDK OK"
 
+      # Alipay SDK ships as a CocoaPod only -- there is no Swift Package
+      # Manager version of it. Flutter enables SPM by default on recent
+      # versions, which means pods get installed but never linked, and
+      # `#if canImport(AlipaySDK)` evaluates to false at compile time.
+      # Turning SPM off before `pod install` puts every plugin back on the
+      # Pods path, which is what the rest of this workflow already assumes.
+      - name: Use CocoaPods instead of Swift Package Manager
+        working-directory: esim_app
+        run: |
+          flutter config --no-enable-swift-package-manager
+          flutter config --list | grep swift-package-manager
+
       - name: Resolve dependencies
         working-directory: esim_app
         run: |

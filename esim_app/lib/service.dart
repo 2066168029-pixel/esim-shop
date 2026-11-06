@@ -69,6 +69,30 @@ class ApiService {
     return (j as Map).cast<String, dynamic>();
   }
 
+  /// Stripe 结账：服务端创建 Checkout Session，返回要跳转的 url。
+  ///
+  /// 金额由服务端从订单行取，客户端传不了价 —— 这里的 order_no 只用来
+  /// 让服务端找到订单，以及让 Stripe 回传时能对上号（client_reference_id）。
+  Future<Map<String, dynamic>> stripeCreate(
+    String orderNo, {
+    required String successUrl,
+    String cancelUrl = "",
+  }) async {
+    final j = await _c.post("/api/payments/stripe/create", auth: false, body: {
+      "order_no": orderNo,
+      "success_url": successUrl,
+      if (cancelUrl.isNotEmpty) "cancel_url": cancelUrl,
+    });
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// 付款完成后确认订单状态。和支付宝同一套：以服务端状态为准。
+  Future<Map<String, dynamic>> stripeStatus(String orderNo) async {
+    final j = await _c.get("/api/payments/stripe/status",
+        auth: false, q: {"order_no": orderNo});
+    return (j as Map).cast<String, dynamic>();
+  }
+
   /// Public payment instructions for this deployment (manual mode text, QR, ...).
   Future<Map<String, dynamic>> paymentInfo() async {
     final j = await _c.get("/api/orders/payment-info", auth: false);

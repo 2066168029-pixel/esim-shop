@@ -82,6 +82,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return ok;
       }
 
+      // Stripe 和支付宝一样：后端结算，这里只问结果
+      if (provider == 'stripe') {
+        final r = await api.stripeStatus(orderNo);
+        final st = r['status'] as String? ?? '';
+        final paid = st == 'paid' || st == 'fulfilled';
+        if (paid) {
+          PendingPayment.instance.markSettled(orderNo);
+          if (mounted) {
+            setState(() => _confirmingPay = false);
+            _snack(t.odPaySuccess);
+            await _load();
+          }
+          return true;
+        }
+        if (mounted) await _load();
+        return false;
+      }
+
       // 支付宝：问后端拿到的是权威状态
       final r = await api.alipayStatus(orderNo);
       final st = r['status'] as String? ?? '';
@@ -157,6 +175,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         gateways: gateways,
         onPayPal: _payWithPayPal,
         onAlipay: _payWithAlipay,
+        onStripe: _payWithStripe,
         onDone: () => _load(),
       ),
     );
@@ -215,6 +234,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         PendingPayment.instance.clear();
         _snack('未检测到支付宝客户端，请先安装支付宝', error: true);
         return;
+      }
+    } catch (e) {
+      PendingPayment.instance.clear();
+      _snack('$e', error: true);
+    } finally {
+      if (mounted) setState(() => _busyPay = false);
+    }
+  }
+
+  /// Stripe 结账。
+  ///
+  /// Stripe 只认浏览器：服务端建 Checkout Session，App 用外部浏览器打开，
+  /// 付完 Stripe 把用户重定向到 success_url，用户关掉浏览器就回到 App。
+  /// 回来时 _payWatcher 自动查状态，和支付宝同一条路径。
+  Future<void> _payWithStripe(Order o) async {
+    final api = context.read<AppState>().api;
+    setState(() => _busyPay = true);
+    try {
+      final res = await api.stripeCreate(
+        o.orderNo,
+        successUrl: 'https://8.218.203.94.nip.io/pay-return?order=${o.orderNo}',
+      );
+      final url = res['url'] as String? ?? '';
+      if (url.isEmpty) {
+        _snack('Stripe 下单失败：服务端没有返回跳转地址', error: true);
+        return;
+      }
+
+      PendingPayment.instance.begin(o.orderNo, 'stripe');
+
+      final uri = Uri.tryParse(url);
+      final opened = uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened) {
+        PendingPayment.instance.clear();
+        _snack('打不开浏览器，无法完成 Stripe 支付', error: true);
       }
     } catch (e) {
       PendingPayment.instance.clear();
@@ -539,9 +594,10 @@ class _PaySheet extends StatelessWidget {
   final List<PaymentGateway> gateways;
   final Future<void> Function(Order) onPayPal;
   final Future<void> Function(Order) onAlipay;
+  final Future<void> Function(Order) onStripe;
   final VoidCallback onDone;
   const _PaySheet({required this.order, required this.gateways, required this.onPayPal,
-      required this.onAlipay, required this.onDone});
+      required this.onAlipay, required this.onStripe, required this.onDone});
 
   static const _icons = <String, IconData>{
     'alipay': Icons.account_balance_wallet,
@@ -601,6 +657,10 @@ class _PaySheet extends StatelessWidget {
         }
         if (g.provider == 'alipay') {
           await onAlipay(order);
+          return;
+        }
+        if (g.provider == 'stripe') {
+          await onStripe(order);
           return;
         }
         await _showInstructions(context, g);

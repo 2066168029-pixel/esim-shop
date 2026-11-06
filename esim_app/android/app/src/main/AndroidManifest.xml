@@ -28,7 +28,7 @@
     <uses-feature android:name="android.hardware.telephony.euicc" android:required="false"/>
 
     <application
-        android:label="eSIM商城"
+        android:label="OnlyLink"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

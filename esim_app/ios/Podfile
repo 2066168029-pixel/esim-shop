@@ -34,6 +34,10 @@ target 'Runner' do
   # download step. The podspec also excludes simulator archs.
   pod 'eSIMManagerSDK', :path => 'Frameworks'
 
+  # 支付宝 App 支付。走官方 SDK 才能拿到「付完自动跳回 App」的 URL 回调；
+  # 只用 url_launcher 打开网页是收不到结果的。
+  pod 'AlipaySDK-iOS'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths

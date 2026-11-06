@@ -74,5 +74,12 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:mimeType="application/vnd.android.package-archive"/>
         </intent>
+        <!-- 支付宝：Android 11+ 必须先声明才查得到这个包，
+             否则 resolveActivity 永远返回 null，会误判成"没装支付宝" -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="alipays"/>
+        </intent>
+        <package android:name="com.eg.android.AlipayGphone"/>
     </queries>
 </manifest>

@@ -8,6 +8,7 @@ class MainActivity : FlutterActivity() {
 
     private var esimChannel: ESimChannel? = null
     private var lpadChannel: LpadChannel? = null
+    private var alipayChannel: AlipayChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -43,6 +44,17 @@ class MainActivity : FlutterActivity() {
             android.util.Log.e("MainActivity", "LPA BLE channel unavailable", t)
             lpadChannel = null
         }
+
+        // 支付宝：只负责把用户送到收银台，付没付由服务端异步通知判定。
+        try {
+            val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AlipayChannel.CHANNEL_NAME)
+            val alipay = AlipayChannel(this, ch)
+            alipayChannel = alipay
+            ch.setMethodCallHandler(alipay)
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "Alipay channel unavailable", t)
+            alipayChannel = null
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -58,6 +70,12 @@ class MainActivity : FlutterActivity() {
             android.util.Log.w("MainActivity", "LPA channel cleanup failed", t)
         }
         lpadChannel = null
+        try {
+            alipayChannel?.dispose()
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "Alipay channel cleanup failed", t)
+        }
+        alipayChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

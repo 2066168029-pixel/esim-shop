@@ -49,6 +49,26 @@ class ApiService {
     return (j as Map).cast<String, dynamic>();
   }
 
+  /// 支付宝 App 支付：服务端下单并签名，返回 order_string。
+  ///
+  /// order_string 由服务端私钥签名，金额和标题都锁在里面，客户端改不动。
+  /// 拿到后交给支付宝 SDK 拉起收银台，付完支付宝会回到 App。
+  Future<Map<String, dynamic>> alipayCreate(String orderNo) async {
+    final j = await _c.post("/api/payments/alipay/create",
+        auth: false, body: {"order_no": orderNo});
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// 付款完成后确认订单状态。
+  ///
+  /// 支付宝的异步通知是服务端到服务端的，可能比 App 返回慢几秒，
+  /// 所以 App 回来后轮询这个接口直到状态变成 paid / fulfilled。
+  Future<Map<String, dynamic>> alipayStatus(String orderNo) async {
+    final j = await _c.get("/api/payments/alipay/status",
+        auth: false, q: {"order_no": orderNo});
+    return (j as Map).cast<String, dynamic>();
+  }
+
   /// Public payment instructions for this deployment (manual mode text, QR, ...).
   Future<Map<String, dynamic>> paymentInfo() async {
     final j = await _c.get("/api/orders/payment-info", auth: false);

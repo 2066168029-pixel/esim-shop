@@ -11,6 +11,7 @@ import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../pay_icons.dart';
+import '../payment_return.dart';
 import '../widgets.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -30,10 +31,75 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// double tap cannot fire two captures.
   bool _busyPay = false;
 
+  /// 正在等支付结果（从浏览器 / 支付宝回来后核对中）。
+  bool _confirmingPay = false;
+
+  /// App 回到前台时自动核对订单 —— 付款完成不需要用户再点一次。
+  late final PaymentReturnWatcher _payWatcher = PaymentReturnWatcher(
+    onReturn: () {
+      if (!mounted) return;
+      setState(() => _confirmingPay = true);
+    },
+    onCheck: _confirmPaymentResult,
+  );
+
   @override
   void initState() {
     super.initState();
+    _payWatcher.attach();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _payWatcher.detach();
+    super.dispose();
+  }
+
+  /// 回到前台后确认这笔订单到底付没付。
+  ///
+  /// 支付宝走的是服务端异步通知，钱在服务端就已经结清了，这里只是查结果；
+  /// PayPal 还差一步 capture，需要在这里补上。两种都幂等，重复问不会重复扣款。
+  Future<bool> _confirmPaymentResult() async {
+    final api = context.read<AppState>().api;
+    final orderNo = PendingPayment.instance.orderNo ?? widget.orderNo;
+    final provider = PendingPayment.instance.provider ?? '';
+
+    try {
+      if (provider == 'paypal') {
+        // capture 本身就带结算，成功即结束
+        final r = await api.paypalCapture(orderNo);
+        final st = r['status'] as String? ?? '';
+        final ok = r['ok'] == true || st == 'paid' || st == 'fulfilled';
+        if (ok) {
+          PendingPayment.instance.markSettled(orderNo);
+          if (mounted) {
+            setState(() => _confirmingPay = false);
+            _snack(t.odPaySuccess);
+            await _load();
+          }
+        }
+        return ok;
+      }
+
+      // 支付宝：问后端拿到的是权威状态
+      final r = await api.alipayStatus(orderNo);
+      final st = r['status'] as String? ?? '';
+      final paid = st == 'paid' || st == 'fulfilled';
+      if (paid) {
+        PendingPayment.instance.markSettled(orderNo);
+        if (mounted) {
+          setState(() => _confirmingPay = false);
+          _snack(t.odPaySuccess);
+          await _load();
+        }
+        return true;
+      }
+      if (mounted) await _load();
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _load() async {
@@ -90,6 +156,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         order: o,
         gateways: gateways,
         onPayPal: _payWithPayPal,
+        onAlipay: _payWithAlipay,
         onDone: () => _load(),
       ),
     );
@@ -104,64 +171,71 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _snack(t.odPaypalFailed, error: true);
         return;
       }
+      // 记下这笔支付，App 回到前台时会自动核对结果 —— 不需要用户再点确认。
+      PendingPayment.instance.begin(o.orderNo, 'paypal');
+
       final uri = Uri.tryParse(url);
       if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!opened) {
+          PendingPayment.instance.clear();
+          _snack(t.odPaypalFailed, error: true);
+          return;
+        }
       }
 
-      // PayPal only authorises in the browser. The money is not taken until the
-      // order is captured, and the backend will not settle it on its own. Ask
-      // the user to confirm once they are back, then capture.
-      if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text(t.odPaidConfirmTitle),
-          content: const Text(
-            '在 PayPal 完成付款后返回本页面。\n\n'
-            '点击「确认支付」以完成扣款；如果还没付款，点击「稍后」会保留订单，'
-            '稍后仍可在本页继续支付。',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.odLater)),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.odConfirmPayment)),
-          ],
-        ),
-      );
-      if (ok != true) {
-        _snack(t.odOrderKept);
-        await _load();
-        return;
-      }
-
-      await _capturePayPal(o);
+      // 用户可能没付就回来了，这里只提示「已跳转」，结果由 watcher 判定。
+      _snack(t.odOrderKept);
     } catch (e) {
       _snack('$e', error: true);
     }
   }
 
-  /// Capture a PayPal authorisation and settle the order.
+  /// 支付宝 App 支付。
   ///
-  /// The backend is idempotent, so pressing this twice is safe: the second call
-  /// returns already=true instead of charging again.
-  Future<void> _capturePayPal(Order o) async {
+  /// 服务端签名出 orderString，App 拉起支付宝。付款完成后支付宝自己回到本 App，
+  /// App 回到前台时由 _payWatcher 自动确认结果 —— 用户什么都不用点。
+  Future<void> _payWithAlipay(Order o) async {
     final api = context.read<AppState>().api;
     setState(() => _busyPay = true);
     try {
-      final r = await api.paypalCapture(o.orderNo);
-      final status = r['status'] as String? ?? '';
-      if (status == 'paid' || status == 'fulfilled' || r['ok'] == true) {
-        _snack(t.odPaySuccess);
-        await _load();
-      } else {
-        _snack('支付未完成（状态：$status），请稍后在订单页重试', error: true);
-        await _load();
+      final res = await api.alipayCreate(o.orderNo);
+      final orderString = res['order_string'] as String? ?? '';
+      if (orderString.isEmpty) {
+        _snack('支付宝下单失败：服务端没有返回 order_string', error: true);
+        return;
+      }
+
+      PendingPayment.instance.begin(o.orderNo, 'alipay');
+
+      // 支付宝 SDK 由原生侧提供（alipay_kit 插件）。没有装插件时退化成
+      // 「记下这笔支付，回前台再查状态」，至少不会丢单。
+      final ok = await _invokeAlipay(orderString);
+      if (!ok) {
+        PendingPayment.instance.clear();
+        _snack('未检测到支付宝客户端，请先安装支付宝', error: true);
+        return;
       }
     } catch (e) {
-      _snack(t.odConfirmFailed('$e'), error: true);
-      await _load();
+      PendingPayment.instance.clear();
+      _snack('$e', error: true);
     } finally {
       if (mounted) setState(() => _busyPay = false);
+    }
+  }
+
+  /// 调起支付宝。走 MethodChannel，原生侧没实现时返回 false。
+  Future<bool> _invokeAlipay(String orderString) async {
+    const ch = MethodChannel('onlylink/alipay');
+    try {
+      final r = await ch.invokeMethod<String>('pay', {"orderString": orderString});
+      // 9000 = 支付成功；6001 = 用户取消；其余为失败。
+      // 这里不信任返回码，最终以服务端状态为准，返回码只用来决定要不要继续等。
+      return r != null;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
     }
   }
 
@@ -171,7 +245,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: Text(t.odCancelOrder),
-        content: Text(t.odCancelConfirm + '，请先联系客服。'),
+        content: Text('${t.odCancelConfirm}，请先联系客服。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.odBack)),
           FilledButton(
@@ -308,7 +382,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _busyPay ? null : () => _payNow(o),
+                onPressed: (_busyPay || _confirmingPay) ? null : () => _payNow(o),
                 child: _busyPay
                     ? const SizedBox(
                         height: 18,
@@ -464,8 +538,10 @@ class _PaySheet extends StatelessWidget {
   final Order order;
   final List<PaymentGateway> gateways;
   final Future<void> Function(Order) onPayPal;
+  final Future<void> Function(Order) onAlipay;
   final VoidCallback onDone;
-  const _PaySheet({required this.order, required this.gateways, required this.onPayPal, required this.onDone});
+  const _PaySheet({required this.order, required this.gateways, required this.onPayPal,
+      required this.onAlipay, required this.onDone});
 
   static const _icons = <String, IconData>{
     'alipay': Icons.account_balance_wallet,
@@ -521,6 +597,10 @@ class _PaySheet extends StatelessWidget {
         Navigator.pop(context);
         if (g.provider == 'paypal') {
           await onPayPal(order);
+          return;
+        }
+        if (g.provider == 'alipay') {
+          await onAlipay(order);
           return;
         }
         await _showInstructions(context, g);

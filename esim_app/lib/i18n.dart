@@ -103,8 +103,8 @@ class L {
   String get saved => _t({AppLang.en: 'Saved to album', AppLang.zh: '已保存到相册', AppLang.ja: 'アルバムに保存しました', AppLang.ko: '앨범에 저장되었습니다', AppLang.th: 'บันทึกไปยังอัลบั้มแล้ว', AppLang.vi: 'Đã lưu vào thư viện ảnh'});
   String get invitedFriends => _t({AppLang.en: 'Invited', AppLang.zh: '已邀请', AppLang.ja: '招待人数', AppLang.ko: '초대 인원', AppLang.th: 'จำนวนที่เชิญ', AppLang.vi: 'Đã mời'});
   String get qualifiedFriends => _t({AppLang.en: 'Rewarded', AppLang.zh: '已达标', AppLang.ja: '成立人数', AppLang.ko: '달성 인원', AppLang.th: 'ที่สำเร็จ', AppLang.vi: 'Đã đạt'});
-  String get savePoster => _t({AppLang.en: 'Save poster', AppLang.zh: '保存海报', AppLang.ja: 'ポスターを保存', AppLang.ko: '포스터 저장', AppLang.th: 'บันทึกโปสเตอร์', AppLang.vi: 'L?u poster'});
-  String get sharePoster => _t({AppLang.en: 'Share poster', AppLang.zh: '分享海报', AppLang.ja: 'ポスターを共有', AppLang.ko: '포스터 공유', AppLang.th: 'แชร์โปสเตอร์', AppLang.vi: 'Chia s? poster'});
+  String get savePoster => _t({AppLang.en: 'Save poster', AppLang.zh: '保存海报', AppLang.ja: 'ポスターを保存', AppLang.ko: '포스터 저장', AppLang.th: 'บันทึกโปสเตอร์', AppLang.vi: 'Lưu poster'});
+  String get sharePoster => _t({AppLang.en: 'Share poster', AppLang.zh: '分享海报', AppLang.ja: 'ポスターを共有', AppLang.ko: '포스터 공유', AppLang.th: 'แชร์โปสเตอร์', AppLang.vi: 'Chia sẻ poster'});
 
   String get qrCode => _t({AppLang.en: 'QR Code', AppLang.zh: '二维码', AppLang.ja: 'QR コード', AppLang.ko: 'QR 코드', AppLang.th: 'คิวอาร์โค้ด', AppLang.vi: 'Mã QR'});
   String get language => _t({AppLang.en: 'Language', AppLang.zh: '语言', AppLang.ja: '言語', AppLang.ko: '언어', AppLang.th: 'ภาษา', AppLang.vi: 'Ngôn ngữ'});

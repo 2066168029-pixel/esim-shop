@@ -230,29 +230,55 @@ jobs:
         if: env.HAS_SIGNING != 'true'
         working-directory: esim_app
         run: |
-          # --no-codesign 只编 .app，不会找开发团队/描述文件，所以不会像
-          # `flutter build ipa` 那样因为「未选择 Team」直接失败。
-          # 构建前把实际生效的签名设置打出来：这一行能立刻证明
-          # "CODE_SIGN_IDENTITY" 到底是空还是 iPhone Developer，
-          # 省得再来一轮"改了没生效"的猜谜。
-          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
-            -configuration Release -showBuildSettings 2>/dev/null \
-            | grep -E "CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM|PROVISIONING_PROFILE" \
-            || true
+          set -o pipefail
 
-          flutter build ios --release --no-codesign
-          APP="build/ios/iphoneos/Runner.app"
-          test -d "$APP" || { echo "ERROR: $APP 未生成" >&2; exit 1; }
-          # 未签名时 Xcode 也可能塞一个空壳 _CodeSignature，删掉更干净
+          # 关键：不调用 `flutter build ios`。
+          # 它内部跑的是 `xcodebuild -scheme Runner build`，会走完整的
+          # 签名/描述文件校验（日志里 PROVISIONING_PROFILE_REQUIRED=YES 就是它
+          # 加上的），没有 Team 必然失败。
+          #
+          # 先让 flutter 只做 Dart/资源侧的准备（它不碰签名）：
+          flutter build bundle --release
+
+          # 再由我们直接驱动 xcodebuild，把所有签名相关开关显式关掉。
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            PROVISIONING_PROFILE="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build | tee /tmp/xcodebuild.log
+
+          # 产物可能在 derivedDataPath 下的 Build/Products/Release-iphoneos
+          APP="build/ios/Build/Products/Release-iphoneos/Runner.app"
+          if [ ! -d "$APP" ]; then
+            echo "ERROR: $APP 未生成" >&2
+            find build/ios -name 'Runner.app' -maxdepth 6 || true
+            grep -E "error:|BUILD FAILED" /tmp/xcodebuild.log | tail -30 || true
+            exit 1
+          fi
           rm -rf "$APP/_CodeSignature" "$APP/embedded.mobileprovision" || true
           echo "app built: $(du -sh "$APP" | cut -f1)"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
 
       - name: Package unsigned IPA
         if: env.HAS_SIGNING != 'true'
-        working-directory: esim_app/build/ios/iphoneos
+        working-directory: esim_app
         run: |
-          rm -rf Payload && mkdir -p Payload
-          cp -R Runner.app Payload/
+          APP="${APP_PATH:-build/ios/Build/Products/Release-iphoneos/Runner.app}"
+          rm -rf build/_ipa && mkdir -p build/_ipa/Payload
+          cp -R "$APP" build/_ipa/Payload/
+          cd build/_ipa
           OUT="$GITHUB_WORKSPACE/esim_app-unsigned.ipa"
           rm -f "$OUT"
           # -y 保留符号链接（framework 里很多），没有它解包后框架会坏

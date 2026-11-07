@@ -111,6 +111,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         onPayPal: _payWithPayPal,
         onAlipay: _payWithAlipayH5,
         onAntom: _payWithAntom,
+        onStripe: _payWithStripe,
         onDone: () => _load(),
       ),
     );
@@ -151,6 +152,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           title: '国际支付宝付款',
           hostedUrl: url,
           checkStatus: () async => (await api.antomStatus(o.orderNo)),
+        ),
+      ),
+    );
+    await _load();
+    if (!mounted) return;
+    if (result == AlipayH5Result.paid) {
+      _snack('支付成功，eSIM 已发放');
+    } else {
+      _snack('支付未完成，订单已保留，可稍后继续支付');
+    }
+  }
+
+  /// Stripe Checkout.
+  ///
+  /// The server creates the session (amount comes from our order row, never
+  /// from the client) and hands back the hosted URL. Stripe settles through
+  /// its webhook, so like Alipay we open the page and poll for the result.
+  Future<void> _payWithStripe(Order o) async {
+    final api = context.read<AppState>().api;
+    Map<String, dynamic> res;
+    try {
+      res = await api.stripeCreate(o.orderNo);
+    } catch (e) {
+      _snack('$e', error: true);
+      return;
+    }
+    final url = (res['url'] as String?) ?? '';
+    if (url.isEmpty) {
+      _snack('Stripe 下单失败，请稍后在订单页重试', error: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await Navigator.push<AlipayH5Result>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlipayH5PayPage(
+          title: 'Stripe 付款',
+          hostedUrl: url,
+          checkStatus: () async => await api.stripeStatus(o.orderNo),
         ),
       ),
     );
@@ -573,6 +614,7 @@ class _PaySheet extends StatelessWidget {
   final Future<void> Function(Order) onPayPal;
   final Future<void> Function(Order) onAlipay;
   final Future<void> Function(Order) onAntom;
+  final Future<void> Function(Order) onStripe;
   final VoidCallback onDone;
   const _PaySheet({
     required this.order,
@@ -580,6 +622,7 @@ class _PaySheet extends StatelessWidget {
     required this.onPayPal,
     required this.onAlipay,
     required this.onAntom,
+    required this.onStripe,
     required this.onDone,
   });
 
@@ -649,6 +692,11 @@ class _PaySheet extends StatelessWidget {
         // International Alipay (Antom) has its own gateway and credentials.
         if (g.provider == 'antom') {
           await onAntom(order);
+          return;
+        }
+        // Stripe Checkout: server creates the session, we open its hosted URL.
+        if (g.provider == 'stripe') {
+          await onStripe(order);
           return;
         }
         await _showInstructions(context, g);

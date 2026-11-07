@@ -18,6 +18,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Result of one H5 checkout attempt.
@@ -115,6 +116,7 @@ class _AlipayH5PayPageState extends State<AlipayH5PayPage> {
   late final WebViewController _controller;
   Timer? _timer;
   bool _settled = false;
+  bool _hintShown = false;
 
   @override
   void initState() {
@@ -150,10 +152,36 @@ class _AlipayH5PayPageState extends State<AlipayH5PayPage> {
     _timer = Timer.periodic(widget.pollInterval, (_) => _poll());
   }
 
-  void _tryExternal(String url) {
-    // The cashier also offers "open in app"; ignoring it is safer than
-    // launching an app we cannot observe. The page stays usable either way.
-    debugPrint('alipay h5: blocked native hand-off $url');
+  Future<void> _tryExternal(String url) async {
+    // The H5 cashier at mclient.alipay.com is only a launcher page: its body is
+    // just "加载中" and all the real work happens after it hands off to the
+    // Alipay app via an alipays:// scheme. Swallowing that hand-off is exactly
+    // what leaves the WebView stuck on a blank page, so hand it to the OS.
+    // Settlement is still confirmed by polling, never by this callback.
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      debugPrint('alipay h5: hand-off $url -> $ok');
+      if (!ok && mounted) {
+        _showHandoffHint();
+      }
+    } catch (e) {
+      debugPrint('alipay h5: hand-off failed $e');
+      if (mounted) _showHandoffHint();
+    }
+  }
+
+  /// No Alipay app installed: say so instead of leaving a blank screen.
+  void _showHandoffHint() {
+    if (_hintShown) return;
+    _hintShown = true;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('未能打开支付宝，请确认已安装支付宝 App；也可返回后重新发起支付'),
+        duration: Duration(seconds: 6),
+      ),
+    );
   }
 
   @override

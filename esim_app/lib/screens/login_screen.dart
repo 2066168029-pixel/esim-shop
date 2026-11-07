@@ -102,7 +102,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          const Center(child: BrandMark(size: 60, filled: false)),
+          const SizedBox(height: 16),
           Text(t.resetPasswordIntro,
               style: TextStyle(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 20),
@@ -364,11 +366,12 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: const EdgeInsets.all(20),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
-          const SizedBox(height: 12),
-          const Center(
-            child: BrandMark(size: 76),
+          const SizedBox(height: 8),
+          // Brand hero: same artwork as the launcher icon, wordmark included.
+          Center(
+            child: BrandMark(size: 132, wordmark: true, filled: false),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
           TextField(
             controller: _email,

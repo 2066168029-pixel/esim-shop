@@ -232,6 +232,14 @@ jobs:
         run: |
           # --no-codesign 只编 .app，不会找开发团队/描述文件，所以不会像
           # `flutter build ipa` 那样因为「未选择 Team」直接失败。
+          # 构建前把实际生效的签名设置打出来：这一行能立刻证明
+          # "CODE_SIGN_IDENTITY" 到底是空还是 iPhone Developer，
+          # 省得再来一轮"改了没生效"的猜谜。
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+            -configuration Release -showBuildSettings 2>/dev/null \
+            | grep -E "CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM|PROVISIONING_PROFILE" \
+            || true
+
           flutter build ios --release --no-codesign
           APP="build/ios/iphoneos/Runner.app"
           test -d "$APP" || { echo "ERROR: $APP 未生成" >&2; exit 1; }

@@ -49,48 +49,22 @@ class ApiService {
     return (j as Map).cast<String, dynamic>();
   }
 
-  /// 支付宝 App 支付：服务端下单并签名，返回 order_string。
+  /// Start an Alipay payment for a pending order.
   ///
-  /// order_string 由服务端私钥签名，金额和标题都锁在里面，客户端改不动。
-  /// 拿到后交给支付宝 SDK 拉起收银台，付完支付宝会回到 App。
+  /// Returns `{order_string, charge_url, amount, currency, ...}`. The H5
+  /// cashier is built from these (see `alipay_h5.dart`); `charge_url` is the
+  /// gateway endpoint the signed order string is posted to (sandbox and live
+  /// differ), so it must come from the server rather than being hardcoded.
   Future<Map<String, dynamic>> alipayCreate(String orderNo) async {
     final j = await _c.post("/api/payments/alipay/create",
-        auth: false, body: {"order_no": orderNo});
+        auth: true, body: {"order_no": orderNo});
     return (j as Map).cast<String, dynamic>();
   }
 
-  /// 付款完成后确认订单状态。
-  ///
-  /// 支付宝的异步通知是服务端到服务端的，可能比 App 返回慢几秒，
-  /// 所以 App 回来后轮询这个接口直到状态变成 paid / fulfilled。
-  Future<Map<String, dynamic>> alipayStatus(String orderNo) async {
-    final j = await _c.get("/api/payments/alipay/status",
-        auth: false, q: {"order_no": orderNo});
-    return (j as Map).cast<String, dynamic>();
-  }
-
-  /// Stripe 结账：服务端创建 Checkout Session，返回要跳转的 url。
-  ///
-  /// 金额由服务端从订单行取，客户端传不了价 —— 这里的 order_no 只用来
-  /// 让服务端找到订单，以及让 Stripe 回传时能对上号（client_reference_id）。
-  Future<Map<String, dynamic>> stripeCreate(
-    String orderNo, {
-    required String successUrl,
-    String cancelUrl = "",
-  }) async {
-    final j = await _c.post("/api/payments/stripe/create", auth: false, body: {
-      "order_no": orderNo,
-      "success_url": successUrl,
-      if (cancelUrl.isNotEmpty) "cancel_url": cancelUrl,
-    });
-    return (j as Map).cast<String, dynamic>();
-  }
-
-  /// 付款完成后确认订单状态。和支付宝同一套：以服务端状态为准。
-  Future<Map<String, dynamic>> stripeStatus(String orderNo) async {
-    final j = await _c.get("/api/payments/stripe/status",
-        auth: false, q: {"order_no": orderNo});
-    return (j as Map).cast<String, dynamic>();
+  /// Poll the settlement state of an Alipay order (public, no token).
+  Future<String> alipayStatus(String orderNo) async {
+    final j = await _c.get("/api/payments/alipay/status", q: {"order_no": orderNo});
+    return (j as Map)["status"] as String? ?? "";
   }
 
   /// Public payment instructions for this deployment (manual mode text, QR, ...).

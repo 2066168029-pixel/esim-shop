@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
+import '../alipay_h5.dart';
 import '../i18n.dart';
 import '../job_executor.dart';
 import '../lpad_ble.dart' as vendor;
@@ -1567,6 +1568,32 @@ class _CardWriterScreenV2State extends State<CardWriterScreenV2> {
       _appendInfo('扩容订单 ${order.orderNo} 已创建（${order.status}）');
       if (order.status == 'paid' || order.status == 'fulfilled') {
         await _refreshQuota();
+      } else if (gateway.provider == 'alipay') {
+        // Alipay goes through the H5 cashier: no native SDK, works on iOS.
+        final res = await state.api.alipayCreate(order.orderNo);
+        final orderString = res['order_string'] as String? ?? '';
+        final chargeUrl = res['charge_url'] as String? ?? '';
+        if (orderString.isEmpty || chargeUrl.isEmpty) {
+          _appendInfo('支付宝下单失败，请稍后在「我的订单」重试');
+          return;
+        }
+        if (!mounted) return;
+        final r = await Navigator.push<AlipayH5Result>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AlipayH5PayPage(
+              chargeUrl: chargeUrl,
+              orderString: orderString,
+              checkStatus: () async => state.api.alipayStatus(order.orderNo),
+            ),
+          ),
+        );
+        if (r == AlipayH5Result.paid) {
+          _appendInfo('支付成功，配额已更新');
+          await _refreshQuota();
+        } else {
+          _appendInfo('支付未完成，可在「我的订单」继续支付');
+        }
       } else if (gateway.provider == 'paypal') {
         // Only PayPal has a live create/capture flow server-side. Every other
         // channel is a display-only record, so sending the customer there

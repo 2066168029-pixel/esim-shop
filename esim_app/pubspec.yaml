@@ -41,3 +41,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/invite_poster.jpg
+    - assets/brand/app_icon.png
+    - assets/brand/logo_wordmark.png
+    - assets/brand/mark.png

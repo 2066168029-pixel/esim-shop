@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,24 +7,28 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
+import '../alipay_h5.dart';
 import '../currency.dart';
-import '../i18n.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../pay_icons.dart';
-import '../payment_return.dart';
 import '../widgets.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderNo;
-  const OrderDetailScreen({super.key, required this.orderNo});
+
+  /// Payment channel picked at checkout ('alipay' / 'paypal' / ...), if any.
+  ///
+  /// Alipay is paid on this page (H5 cashier), so the user should not have to
+  /// find "pay now" again after placing the order.
+  final String autoPay;
+
+  const OrderDetailScreen({super.key, required this.orderNo, this.autoPay = ''});
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  L get t => context.read<AppState>().t;
-
   Order? _order;
   String? _err;
 
@@ -31,109 +36,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// double tap cannot fire two captures.
   bool _busyPay = false;
 
-  /// 正在等支付结果（从浏览器 / 支付宝回来后核对中）。
-  bool _confirmingPay = false;
-
-  /// App 回到前台时自动核对订单 —— 付款完成不需要用户再点一次。
-  late final PaymentReturnWatcher _payWatcher = PaymentReturnWatcher(
-    onReturn: () {
-      if (!mounted) return;
-      setState(() => _confirmingPay = true);
-    },
-    onCheck: _confirmPaymentResult,
-  );
-
   @override
   void initState() {
     super.initState();
-    _payWatcher.attach();
     _load();
   }
 
-  @override
-  void dispose() {
-    _payWatcher.detach();
-    super.dispose();
-  }
-
-  /// 回到前台后确认这笔订单到底付没付。
-  ///
-  /// 支付宝走的是服务端异步通知，钱在服务端就已经结清了，这里只是查结果；
-  /// PayPal 还差一步 capture，需要在这里补上。两种都幂等，重复问不会重复扣款。
-  Future<bool> _confirmPaymentResult() async {
-    final api = context.read<AppState>().api;
-    final orderNo = PendingPayment.instance.orderNo ?? widget.orderNo;
-    final provider = PendingPayment.instance.provider ?? '';
-
-    try {
-      if (provider == 'paypal') {
-        // capture 本身就带结算，成功即结束
-        final r = await api.paypalCapture(orderNo);
-        final st = r['status'] as String? ?? '';
-        final ok = r['ok'] == true || st == 'paid' || st == 'fulfilled';
-        if (ok) {
-          PendingPayment.instance.markSettled(orderNo);
-          if (mounted) {
-            setState(() => _confirmingPay = false);
-            _snack(t.odPaySuccess);
-            await _load();
-          }
-        }
-        return ok;
-      }
-
-      // Stripe 和支付宝一样：后端结算，这里只问结果
-      if (provider == 'stripe') {
-        final r = await api.stripeStatus(orderNo);
-        final st = r['status'] as String? ?? '';
-        final paid = st == 'paid' || st == 'fulfilled';
-        if (paid) {
-          PendingPayment.instance.markSettled(orderNo);
-          if (mounted) {
-            setState(() => _confirmingPay = false);
-            _snack(t.odPaySuccess);
-            await _load();
-          }
-          return true;
-        }
-        if (mounted) await _load();
-        return false;
-      }
-
-      // 支付宝：问后端拿到的是权威状态
-      final r = await api.alipayStatus(orderNo);
-      final st = r['status'] as String? ?? '';
-      final paid = st == 'paid' || st == 'fulfilled';
-      if (paid) {
-        PendingPayment.instance.markSettled(orderNo);
-        if (mounted) {
-          setState(() => _confirmingPay = false);
-          _snack(t.odPaySuccess);
-          await _load();
-        }
-        return true;
-      }
-      if (mounted) await _load();
-      return false;
-    } catch (_) {
-      return false;
-    }
-  }
+  /// First load after checkout: if the user picked Alipay, jump straight into
+  /// the H5 cashier instead of leaving a pending order on screen.
+  bool _autoPayPending = false;
 
   Future<void> _load() async {
     setState(() { _order = null; _err = null; });
     try {
       final o = await context.read<AppState>().api.order(widget.orderNo);
       setState(() => _order = o);
+      if (!_autoPayPending && widget.autoPay == 'alipay' && _isUnpaid(o)) {
+        _autoPayPending = true;
+        // Let the page settle before opening a full-screen route.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _payWithAlipayH5(o);
+        });
+      }
     } catch (e) {
       setState(() => _err = '$e');
     }
   }
 
+  bool _isUnpaid(Order o) => o.status != 'paid' && o.status != 'fulfilled';
+
   Future<void> _refreshUsage(int esimId) async {
     try {
       final e = await context.read<AppState>().api.refreshUsage(esimId);
-      _snack(t.odUsedMb(e.dataUsedMb.toStringAsFixed(1)));
+      _snack('已使用 ${e.dataUsedMb.toStringAsFixed(1)} MB');
       _load();
     } catch (e) {
       _snack('$e', error: true);
@@ -154,7 +89,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _QrSheet(esim: e, onCopied: () => _snack(t.odCodeCopied)),
+      builder: (_) => _QrSheet(esim: e, onCopied: () => _snack('激活码已复制')),
     );
   }
 
@@ -174,11 +109,98 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         order: o,
         gateways: gateways,
         onPayPal: _payWithPayPal,
-        onAlipay: _payWithAlipay,
-        onStripe: _payWithStripe,
+        onAlipay: _payWithAlipayH5,
+        onAntom: _payWithAntom,
         onDone: () => _load(),
       ),
     );
+  }
+
+  /// Alipay Global (Antom) cashier.
+  ///
+  /// The backend creates a payment session and hands back `normal_url`, the
+  /// hosted cashier (Alipay+ wallets, cards, local methods). We load it in the
+  /// same WebView used for the domestic cashier and poll our own order status,
+  /// so no native SDK and no URL-scheme callback is needed on iOS.
+  Future<void> _payWithAntom(Order o) async {
+    final api = context.read<AppState>().api;
+    Map<String, dynamic> res;
+    try {
+      res = await api.antomCreate(
+        o.orderNo,
+        terminalType: 'WAP',
+        osType: Platform.isIOS ? 'IOS' : 'ANDROID',
+      );
+    } catch (e) {
+      _snack('$e', error: true);
+      return;
+    }
+    final url = (res['normal_url'] as String?)?.isNotEmpty == true
+        ? res['normal_url'] as String
+        : (res['applink_url'] as String? ?? '');
+    if (url.isEmpty) {
+      _snack('国际支付宝下单失败，请稍后在订单页重试', error: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await Navigator.push<AlipayH5Result>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlipayH5PayPage(
+          title: '国际支付宝付款',
+          hostedUrl: url,
+          checkStatus: () async => (await api.antomStatus(o.orderNo)),
+        ),
+      ),
+    );
+    await _load();
+    if (!mounted) return;
+    if (result == AlipayH5Result.paid) {
+      _snack('支付成功，eSIM 已发放');
+    } else {
+      _snack('支付未完成，订单已保留，可稍后继续支付');
+    }
+  }
+
+  /// Alipay via the H5 cashier (works on iOS without the native SDK).
+  ///
+  /// The backend signs a `alipay.trade.page.pay` URL; we open it in a WebView
+  /// and poll the order status until Alipay's async notification settles it.
+  Future<void> _payWithAlipayH5(Order o) async {
+    final api = context.read<AppState>().api;
+    Map<String, dynamic> res;
+    try {
+      res = await api.alipayCreate(o.orderNo);
+    } catch (e) {
+      _snack('$e', error: true);
+      return;
+    }
+    final orderString = res['order_string'] as String? ?? '';
+    final chargeUrl = res['charge_url'] as String? ?? '';
+    if (orderString.isEmpty || chargeUrl.isEmpty) {
+      _snack('支付宝下单失败，请稍后在订单页重试', error: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await Navigator.push<AlipayH5Result>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlipayH5PayPage(
+          chargeUrl: chargeUrl,
+          orderString: orderString,
+          checkStatus: () async => (await api.alipayStatus(o.orderNo)),
+        ),
+      ),
+    );
+    await _load();
+    if (!mounted) return;
+    if (result == AlipayH5Result.paid) {
+      _snack('支付成功，eSIM 已发放');
+    } else {
+      _snack('支付未完成，订单已保留，可稍后继续支付');
+    }
   }
 
   Future<void> _payWithPayPal(Order o) async {
@@ -187,110 +209,67 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final res = await api.paypalCreate(o.orderNo);
       final url = res['approve_url'] as String? ?? '';
       if (url.isEmpty) {
-        _snack(t.odPaypalFailed, error: true);
+        _snack('PayPal 下单失败，请稍后重试', error: true);
         return;
       }
-      // 记下这笔支付，App 回到前台时会自动核对结果 —— 不需要用户再点确认。
-      PendingPayment.instance.begin(o.orderNo, 'paypal');
-
       final uri = Uri.tryParse(url);
       if (uri != null) {
-        final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!opened) {
-          PendingPayment.instance.clear();
-          _snack(t.odPaypalFailed, error: true);
-          return;
-        }
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
 
-      // 用户可能没付就回来了，这里只提示「已跳转」，结果由 watcher 判定。
-      _snack(t.odOrderKept);
-    } catch (e) {
-      _snack('$e', error: true);
-    }
-  }
-
-  /// 支付宝 App 支付。
-  ///
-  /// 服务端签名出 orderString，App 拉起支付宝。付款完成后支付宝自己回到本 App，
-  /// App 回到前台时由 _payWatcher 自动确认结果 —— 用户什么都不用点。
-  Future<void> _payWithAlipay(Order o) async {
-    final api = context.read<AppState>().api;
-    setState(() => _busyPay = true);
-    try {
-      final res = await api.alipayCreate(o.orderNo);
-      final orderString = res['order_string'] as String? ?? '';
-      if (orderString.isEmpty) {
-        _snack('支付宝下单失败：服务端没有返回 order_string', error: true);
-        return;
-      }
-
-      PendingPayment.instance.begin(o.orderNo, 'alipay');
-
-      // 支付宝 SDK 由原生侧提供（alipay_kit 插件）。没有装插件时退化成
-      // 「记下这笔支付，回前台再查状态」，至少不会丢单。
-      final ok = await _invokeAlipay(orderString);
-      if (!ok) {
-        PendingPayment.instance.clear();
-        _snack('未检测到支付宝客户端，请先安装支付宝', error: true);
-        return;
-      }
-    } catch (e) {
-      PendingPayment.instance.clear();
-      _snack('$e', error: true);
-    } finally {
-      if (mounted) setState(() => _busyPay = false);
-    }
-  }
-
-  /// Stripe 结账。
-  ///
-  /// Stripe 只认浏览器：服务端建 Checkout Session，App 用外部浏览器打开，
-  /// 付完 Stripe 把用户重定向到 success_url，用户关掉浏览器就回到 App。
-  /// 回来时 _payWatcher 自动查状态，和支付宝同一条路径。
-  Future<void> _payWithStripe(Order o) async {
-    final api = context.read<AppState>().api;
-    setState(() => _busyPay = true);
-    try {
-      final res = await api.stripeCreate(
-        o.orderNo,
-        successUrl: 'https://8.218.203.94.nip.io/pay-return?order=${o.orderNo}',
+      // PayPal only authorises in the browser. The money is not taken until the
+      // order is captured, and the backend will not settle it on its own. Ask
+      // the user to confirm once they are back, then capture.
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('已完成付款？'),
+          content: const Text(
+            '在 PayPal 完成付款后返回本页面。\n\n'
+            '点击「确认支付」以完成扣款；如果还没付款，点击「稍后」会保留订单，'
+            '稍后仍可在本页继续支付。',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('稍后')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('确认支付')),
+          ],
+        ),
       );
-      final url = res['url'] as String? ?? '';
-      if (url.isEmpty) {
-        _snack('Stripe 下单失败：服务端没有返回跳转地址', error: true);
+      if (ok != true) {
+        _snack('已保留订单，稍后可在本页继续支付');
+        await _load();
         return;
       }
 
-      PendingPayment.instance.begin(o.orderNo, 'stripe');
-
-      final uri = Uri.tryParse(url);
-      final opened = uri != null &&
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!opened) {
-        PendingPayment.instance.clear();
-        _snack('打不开浏览器，无法完成 Stripe 支付', error: true);
-      }
+      await _capturePayPal(o);
     } catch (e) {
-      PendingPayment.instance.clear();
       _snack('$e', error: true);
-    } finally {
-      if (mounted) setState(() => _busyPay = false);
     }
   }
 
-  /// 调起支付宝。走 MethodChannel，原生侧没实现时返回 false。
-  Future<bool> _invokeAlipay(String orderString) async {
-    const ch = MethodChannel('onlylink/alipay');
+  /// Capture a PayPal authorisation and settle the order.
+  ///
+  /// The backend is idempotent, so pressing this twice is safe: the second call
+  /// returns already=true instead of charging again.
+  Future<void> _capturePayPal(Order o) async {
+    final api = context.read<AppState>().api;
+    setState(() => _busyPay = true);
     try {
-      final r = await ch.invokeMethod<String>('pay', {"orderString": orderString});
-      // 9000 = 支付成功；6001 = 用户取消；其余为失败。
-      // 这里不信任返回码，最终以服务端状态为准，返回码只用来决定要不要继续等。
-      return r != null;
-    } on MissingPluginException {
-      return false;
-    } on PlatformException {
-      return false;
+      final r = await api.paypalCapture(o.orderNo);
+      final status = r['status'] as String? ?? '';
+      if (status == 'paid' || status == 'fulfilled' || r['ok'] == true) {
+        _snack('支付成功，eSIM 已发放', );
+        await _load();
+      } else {
+        _snack('支付未完成（状态：$status），请稍后在订单页重试', error: true);
+        await _load();
+      }
+    } catch (e) {
+      _snack('确认支付失败：$e', error: true);
+      await _load();
+    } finally {
+      if (mounted) setState(() => _busyPay = false);
     }
   }
 
@@ -299,14 +278,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(t.odCancelOrder),
-        content: Text('${t.odCancelConfirm}，请先联系客服。'),
+        title: const Text('取消订单'),
+        content: const Text('取消后订单不可恢复。如果已经付款，请先联系客服。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.odBack)),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('返回')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(c, true),
-            child: Text(t.odConfirmCancel),
+            child: const Text('确认取消'),
           ),
         ],
       ),
@@ -318,10 +297,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final api = context.read<AppState>().api;
       await api.cancelOrder(o.orderNo);
       if (!mounted) return;
-      _snack(t.odCancelled);
+      _snack('订单已取消');
       await _load();
     } catch (e) {
-      if (mounted) _snack(t.odCancelFailed('$e'), error: true);
+      if (mounted) _snack('取消失败：$e', error: true);
     }
   }
 
@@ -329,7 +308,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(title: Text(t.odTitle)),
+      appBar: AppBar(title: const Text('订单详情')),
       body: _err != null
           ? errorBox(_err!)
           : _order == null
@@ -356,7 +335,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(t.odNumber(o.orderNo), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
+                  Expanded(child: Text('订单号 ${o.orderNo}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
                   StatusChip(o.status),
                 ],
               ),
@@ -378,14 +357,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(children: [
-                    Text('${t.odDiscount} ${o.couponCode}', style: const TextStyle(color: AppColors.success, fontSize: 13.5)),
+                    Text('优惠 ${o.couponCode}', style: const TextStyle(color: AppColors.success, fontSize: 13.5)),
                     const Spacer(),
                     Text('-${formatInCurrency(o.discount, o.currency)}', style: const TextStyle(fontSize: 13.5, color: AppColors.success)),
                   ]),
                 ),
               const Divider(height: 24),
               Row(children: [
-                Text(t.odTotal, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                const Text('合计', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 const Spacer(),
                 Text(formatInCurrency(o.total, o.currency),
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, color: AppColors.primary)),
@@ -427,7 +406,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Row(children: [
               const Icon(Icons.hourglass_bottom, color: AppColors.warn, size: 20),
               const SizedBox(width: 8),
-              Text(t.odAwaitPay, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              const Text('待付款', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const Spacer(),
                 Text(formatInCurrency(o.total, o.currency), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
             ]),
@@ -437,14 +416,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_busyPay || _confirmingPay) ? null : () => _payNow(o),
+                onPressed: _busyPay ? null : () => _payNow(o),
                 child: _busyPay
                     ? const SizedBox(
                         height: 18,
                         width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(t.odGoPay),
+                    : const Text('去支付'),
               ),
             ),
             const SizedBox(height: 8),
@@ -452,8 +431,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               width: double.infinity,
               child: TextButton(
                 onPressed: _busyPay ? null : () => _cancelOrder(o),
-                child: Text(
-                  t.odCancelOrder,
+                child: const Text(
+                  '取消订单',
                   style: TextStyle(color: AppColors.danger, fontSize: 13),
                 ),
               ),
@@ -500,13 +479,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(t.odDataBalance, style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const Text('数据余额', style: TextStyle(color: Colors.white70, fontSize: 12)),
                       Text(_remainingLabel(o, e), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
                       const SizedBox(height: 6),
-                      Text(t.odUsedMb(e.dataUsedMb.toStringAsFixed(1)),
+                      Text('已用 ${e.dataUsedMb.toStringAsFixed(1)} MB',
                           style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       if (e.expiresAt != null)
-                        Text(t.odValidUntil(DateFormat('yyyy-MM-dd').format(e.expiresAt!.toLocal())),
+                        Text('有效期至 ${DateFormat('yyyy-MM-dd').format(e.expiresAt!.toLocal())}',
                             style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   ),
@@ -524,7 +503,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () => _showQr(e),
-                    child: Text(t.odViewQr, style: TextStyle(fontWeight: FontWeight.w800)),
+                    child: const Text('查看二维码', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -536,7 +515,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () => _refreshUsage(e.id),
-                    child: Text(t.odRefreshUsage, style: TextStyle(fontWeight: FontWeight.w800)),
+                    child: const Text('刷新流量', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -589,18 +568,24 @@ class _UsageRing extends StatelessWidget {
 }
 
 class _PaySheet extends StatelessWidget {
-
   final Order order;
   final List<PaymentGateway> gateways;
   final Future<void> Function(Order) onPayPal;
   final Future<void> Function(Order) onAlipay;
-  final Future<void> Function(Order) onStripe;
+  final Future<void> Function(Order) onAntom;
   final VoidCallback onDone;
-  const _PaySheet({required this.order, required this.gateways, required this.onPayPal,
-      required this.onAlipay, required this.onStripe, required this.onDone});
+  const _PaySheet({
+    required this.order,
+    required this.gateways,
+    required this.onPayPal,
+    required this.onAlipay,
+    required this.onAntom,
+    required this.onDone,
+  });
 
   static const _icons = <String, IconData>{
     'alipay': Icons.account_balance_wallet,
+    'antom': Icons.public,
     'wechat': Icons.chat_bubble,
     'paypal': Icons.account_balance,
     'stripe': Icons.credit_card,
@@ -611,7 +596,6 @@ class _PaySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.read<AppState>().t;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -624,13 +608,13 @@ class _PaySheet extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Row(children: [
-            Text(t.odChoosePayment, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            const Text('选择支付方式', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             const Spacer(),
             Text(formatInCurrency(order.total, order.currency), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary)),
           ]),
           const SizedBox(height: 14),
           if (gateways.isEmpty)
-            Text(t.odNoPayment, style: TextStyle(color: AppColors.muted)),
+            const Text('暂无可用支付方式，请联系客服。', style: TextStyle(color: AppColors.muted)),
           ...gateways.map((g) => _row(context, g)),
         ],
       ),
@@ -655,12 +639,16 @@ class _PaySheet extends StatelessWidget {
           await onPayPal(order);
           return;
         }
+        // Alipay settles server-side (async notify). Its H5 cashier is the only
+        // channel that can actually take money inside the app, so it gets a
+        // real payment screen instead of the "instructions" sheet.
         if (g.provider == 'alipay') {
           await onAlipay(order);
           return;
         }
-        if (g.provider == 'stripe') {
-          await onStripe(order);
+        // International Alipay (Antom) has its own gateway and credentials.
+        if (g.provider == 'antom') {
+          await onAntom(order);
           return;
         }
         await _showInstructions(context, g);
@@ -684,7 +672,7 @@ class _PaySheet extends StatelessWidget {
               child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
             ),
             const SizedBox(height: 18),
-            Text(context.read<AppState>().t.odPayWith(g.label), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            Text('${g.label} 支付', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             const SizedBox(height: 14),
             if (g.qrUrl.isNotEmpty) ...[
               Center(
@@ -711,7 +699,7 @@ class _PaySheet extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(context.read<AppState>().t.odGotIt),
+                child: const Text('我知道了'),
               ),
             ),
           ],
@@ -722,14 +710,12 @@ class _PaySheet extends StatelessWidget {
 }
 
 class _QrSheet extends StatelessWidget {
-
   final Esim esim;
   final VoidCallback onCopied;
   const _QrSheet({required this.esim, required this.onCopied});
 
   @override
   Widget build(BuildContext context) {
-    final t = context.read<AppState>().t;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -738,7 +724,7 @@ class _QrSheet extends StatelessWidget {
         children: [
           Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 18),
-          Text(t.odScanQrActivate, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          const Text('扫描二维码激活 eSIM', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.all(14),
@@ -747,7 +733,7 @@ class _QrSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _kv(context, 'ICCID', esim.iccid),
-          _kv(context, t.odActivationCode, esim.lpaCode, copyable: true),
+          _kv(context, '激活码', esim.lpaCode, copyable: true),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
@@ -755,7 +741,7 @@ class _QrSheet extends StatelessWidget {
               onCopied();
             },
             icon: const Icon(Icons.copy, size: 18),
-            label: Text(t.odCopyCode),
+            label: const Text('复制激活码'),
           ),
           const SizedBox(height: 10),
           const Text('设置 → 蜂窝网络 / eSIM → 添加 eSIM → 扫描二维码',

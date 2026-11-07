@@ -229,18 +229,67 @@ jobs:
       - name: Build iOS (unsigned)
         if: env.HAS_SIGNING != 'true'
         working-directory: esim_app
-        run: flutter build ios --release --no-codesign
+        run: |
+          set -o pipefail
+
+          # 关键：不调用 `flutter build ios`。
+          # 它内部跑的是 `xcodebuild -scheme Runner build`，会走完整的
+          # 签名/描述文件校验（日志里 PROVISIONING_PROFILE_REQUIRED=YES 就是它
+          # 加上的），没有 Team 必然失败。
+          #
+          # 先让 flutter 只做 Dart/资源侧的准备（它不碰签名）：
+          flutter build bundle --release
+
+          # 再由我们直接驱动 xcodebuild，把所有签名相关开关显式关掉。
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            PROVISIONING_PROFILE="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build | tee /tmp/xcodebuild.log
+
+          # 产物可能在 derivedDataPath 下的 Build/Products/Release-iphoneos
+          APP="build/ios/Build/Products/Release-iphoneos/Runner.app"
+          if [ ! -d "$APP" ]; then
+            echo "ERROR: $APP 未生成" >&2
+            find build/ios -name 'Runner.app' -maxdepth 6 || true
+            grep -E "error:|BUILD FAILED" /tmp/xcodebuild.log | tail -30 || true
+            exit 1
+          fi
+          rm -rf "$APP/_CodeSignature" "$APP/embedded.mobileprovision" || true
+          echo "app built: $(du -sh "$APP" | cut -f1)"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
 
       - name: Package unsigned IPA
         if: env.HAS_SIGNING != 'true'
-        working-directory: esim_app/build/ios/iphoneos
+        working-directory: esim_app
         run: |
-          mkdir -p Payload
-          cp -R Runner.app Payload/
+          APP="${APP_PATH:-build/ios/Build/Products/Release-iphoneos/Runner.app}"
+          rm -rf build/_ipa && mkdir -p build/_ipa/Payload
+          cp -R "$APP" build/_ipa/Payload/
+          cd build/_ipa
           OUT="$GITHUB_WORKSPACE/esim_app-unsigned.ipa"
           rm -f "$OUT"
+          # -y 保留符号链接（framework 里很多），没有它解包后框架会坏
           zip -qry "$OUT" Payload
-          ls -lh "$OUT"
+          test -s "$OUT" || { echo "ERROR: IPA 为空" >&2; exit 1; }
+          echo "IPA: $(du -h "$OUT" | cut -f1)"
+          # 自检：Payload 里必须有 Runner.app 和可执行文件
+          unzip -l "$OUT" | grep -q 'Payload/Runner.app/Runner' \
+            && echo "IPA 结构 OK" || { echo "ERROR: IPA 缺少 Runner 可执行文件" >&2; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            Payload/Runner.app/Info.plist | sed 's/^/版本: /'
 
       # ---------- signed ----------
       - name: Import signing certificate

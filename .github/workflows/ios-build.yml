@@ -229,18 +229,33 @@ jobs:
       - name: Build iOS (unsigned)
         if: env.HAS_SIGNING != 'true'
         working-directory: esim_app
-        run: flutter build ios --release --no-codesign
+        run: |
+          # --no-codesign 只编 .app，不会找开发团队/描述文件，所以不会像
+          # `flutter build ipa` 那样因为「未选择 Team」直接失败。
+          flutter build ios --release --no-codesign
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP" || { echo "ERROR: $APP 未生成" >&2; exit 1; }
+          # 未签名时 Xcode 也可能塞一个空壳 _CodeSignature，删掉更干净
+          rm -rf "$APP/_CodeSignature" "$APP/embedded.mobileprovision" || true
+          echo "app built: $(du -sh "$APP" | cut -f1)"
 
       - name: Package unsigned IPA
         if: env.HAS_SIGNING != 'true'
         working-directory: esim_app/build/ios/iphoneos
         run: |
-          mkdir -p Payload
+          rm -rf Payload && mkdir -p Payload
           cp -R Runner.app Payload/
           OUT="$GITHUB_WORKSPACE/esim_app-unsigned.ipa"
           rm -f "$OUT"
+          # -y 保留符号链接（framework 里很多），没有它解包后框架会坏
           zip -qry "$OUT" Payload
-          ls -lh "$OUT"
+          test -s "$OUT" || { echo "ERROR: IPA 为空" >&2; exit 1; }
+          echo "IPA: $(du -h "$OUT" | cut -f1)"
+          # 自检：Payload 里必须有 Runner.app 和可执行文件
+          unzip -l "$OUT" | grep -q 'Payload/Runner.app/Runner' \
+            && echo "IPA 结构 OK" || { echo "ERROR: IPA 缺少 Runner 可执行文件" >&2; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            Payload/Runner.app/Info.plist | sed 's/^/版本: /'
 
       # ---------- signed ----------
       - name: Import signing certificate

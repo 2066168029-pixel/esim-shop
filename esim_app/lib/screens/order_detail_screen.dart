@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -109,9 +110,57 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         gateways: gateways,
         onPayPal: _payWithPayPal,
         onAlipay: _payWithAlipayH5,
+        onAntom: _payWithAntom,
         onDone: () => _load(),
       ),
     );
+  }
+
+  /// Alipay Global (Antom) cashier.
+  ///
+  /// The backend creates a payment session and hands back `normal_url`, the
+  /// hosted cashier (Alipay+ wallets, cards, local methods). We load it in the
+  /// same WebView used for the domestic cashier and poll our own order status,
+  /// so no native SDK and no URL-scheme callback is needed on iOS.
+  Future<void> _payWithAntom(Order o) async {
+    final api = context.read<AppState>().api;
+    Map<String, dynamic> res;
+    try {
+      res = await api.antomCreate(
+        o.orderNo,
+        terminalType: 'WAP',
+        osType: Platform.isIOS ? 'IOS' : 'ANDROID',
+      );
+    } catch (e) {
+      _snack('$e', error: true);
+      return;
+    }
+    final url = (res['normal_url'] as String?)?.isNotEmpty == true
+        ? res['normal_url'] as String
+        : (res['applink_url'] as String? ?? '');
+    if (url.isEmpty) {
+      _snack('国际支付宝下单失败，请稍后在订单页重试', error: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await Navigator.push<AlipayH5Result>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlipayH5PayPage(
+          title: '国际支付宝付款',
+          hostedUrl: url,
+          checkStatus: () async => (await api.antomStatus(o.orderNo)),
+        ),
+      ),
+    );
+    await _load();
+    if (!mounted) return;
+    if (result == AlipayH5Result.paid) {
+      _snack('支付成功，eSIM 已发放');
+    } else {
+      _snack('支付未完成，订单已保留，可稍后继续支付');
+    }
   }
 
   /// Alipay via the H5 cashier (works on iOS without the native SDK).
@@ -523,17 +572,20 @@ class _PaySheet extends StatelessWidget {
   final List<PaymentGateway> gateways;
   final Future<void> Function(Order) onPayPal;
   final Future<void> Function(Order) onAlipay;
+  final Future<void> Function(Order) onAntom;
   final VoidCallback onDone;
   const _PaySheet({
     required this.order,
     required this.gateways,
     required this.onPayPal,
     required this.onAlipay,
+    required this.onAntom,
     required this.onDone,
   });
 
   static const _icons = <String, IconData>{
     'alipay': Icons.account_balance_wallet,
+    'antom': Icons.public,
     'wechat': Icons.chat_bubble,
     'paypal': Icons.account_balance,
     'stripe': Icons.credit_card,
@@ -592,6 +644,11 @@ class _PaySheet extends StatelessWidget {
         // real payment screen instead of the "instructions" sheet.
         if (g.provider == 'alipay') {
           await onAlipay(order);
+          return;
+        }
+        // International Alipay (Antom) has its own gateway and credentials.
+        if (g.provider == 'antom') {
+          await onAntom(order);
           return;
         }
         await _showInstructions(context, g);

@@ -67,6 +67,32 @@ class ApiService {
     return (j as Map)["status"] as String? ?? "";
   }
 
+  /// Start an Alipay Global (Antom) payment for a pending order.
+  ///
+  /// Returns `{normal_url, applink_url, client_secret, payment_id, amount,
+  /// currency}`. The cashier URL is opened in a WebView and the result is
+  /// confirmed by polling [antomStatus]; the same flow works on iOS and Android.
+  Future<Map<String, dynamic>> antomCreate(
+    String orderNo, {
+    String paymentMethodType = "",
+    String terminalType = "WAP",
+    String osType = "",
+  }) async {
+    final j = await _c.post("/api/payments/antom/create", auth: true, body: {
+      "order_no": orderNo,
+      if (paymentMethodType.isNotEmpty) "payment_method_type": paymentMethodType,
+      "terminal_type": terminalType,
+      if (osType.isNotEmpty) "os_type": osType,
+    });
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Poll the settlement state of an Antom order (public, no token).
+  Future<String> antomStatus(String orderNo) async {
+    final j = await _c.get("/api/payments/antom/status", q: {"order_no": orderNo});
+    return (j as Map)["status"] as String? ?? "";
+  }
+
   /// Public payment instructions for this deployment (manual mode text, QR, ...).
   Future<Map<String, dynamic>> paymentInfo() async {
     final j = await _c.get("/api/orders/payment-info", auth: false);

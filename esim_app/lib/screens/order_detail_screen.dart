@@ -7,8 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
+import '../alipay_app.dart';
 import '../alipay_h5.dart';
 import '../currency.dart';
+import '../service.dart' show ApiService;
 import '../store.dart';
 import '../theme.dart';
 import '../pay_icons.dart';
@@ -109,7 +111,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         order: o,
         gateways: gateways,
         onPayPal: _payWithPayPal,
-        onAlipay: _payWithAlipayH5,
+        onAlipay: _payWithAlipay,
         onAntom: _payWithAntom,
         onStripe: _payWithStripe,
         onDone: () => _load(),
@@ -204,10 +206,79 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  /// Alipay via the H5 cashier (works on iOS without the native SDK).
+  /// Alipay via the official **App-pay SDK**.
   ///
-  /// The backend signs a `alipay.trade.page.pay` URL; we open it in a WebView
-  /// and poll the order status until Alipay's async notification settles it.
+  /// Why not H5: the H5 cashier at mclient.alipay.com is only a launcher page
+  /// ("加载中") that hands off through `alipays://`. Inside a Flutter WebView
+  /// that hand-off is unreliable on real devices -- the user sees a blank
+  /// page and nothing happens. The App-pay SDK is the supported path: the
+  /// backend signs `alipay.trade.app.pay`, the native SDK opens the Alipay
+  /// app, and the app comes back with the result.
+  ///
+  /// The SDK result is a *UI hint only*: settlement still comes from Alipay's
+  /// async notify, so we always re-read the order from the server afterwards.
+  Future<void> _payWithAlipay(Order o) async {
+    final api = context.read<AppState>().api;
+
+    Map<String, dynamic> res;
+    try {
+      res = await api.alipayAppCreate(o.orderNo);
+    } catch (e) {
+      // Older builds / no App-pay route on the server: fall back to H5 so the
+      // user is not stuck, but tell them what happened.
+      _snack('App 支付不可用，改用网页支付：$e');
+      await _payWithAlipayH5(o);
+      return;
+    }
+
+    final orderInfo = (res["order_info"] as String?) ?? "";
+    if (orderInfo.isEmpty) {
+      _snack('支付宝下单失败，请稍后在订单页重试', error: true);
+      return;
+    }
+
+    if (!mounted) return;
+    final r = await AlipayAppPay.pay(orderInfo);
+    if (!mounted) return;
+
+    if (r.cancelled) {
+      _snack(r.friendlyMessage);
+      await _load();
+      return;
+    }
+
+    // 9000 / 8000 / 其它：一律以服务端状态为准。付完立刻查一次，未到账则
+    // 短轮询几秒 —— 异步通知通常 1-3 秒内到达。
+    _snack(r.friendlyMessage);
+    final settled = await _awaitSettlement(api, o.orderNo);
+    await _load();
+    if (!mounted) return;
+    if (settled) {
+      _snack('支付成功，eSIM 已发放');
+    } else {
+      _snack('支付尚未确认，订单已保留，可稍后在订单页刷新');
+    }
+  }
+
+  /// Poll the settlement state for a short while after returning from Alipay.
+  ///
+  /// We deliberately do not trust the SDK's 9000: the notify can lag, and a
+  /// forged success on the client must never hand out an eSIM.
+  Future<bool> _awaitSettlement(ApiService api, String orderNo) async {
+    for (var i = 0; i < 10; i++) {
+      try {
+        final st = await api.alipayStatus(orderNo);
+        if (st == 'paid' || st == 'fulfilled') return true;
+      } catch (_) {
+        // Network hiccup: keep trying, the notify will settle it server-side.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return false;
+    }
+    return false;
+  }
+
+  /// Legacy H5 cashier. Kept as a fallback only.
   Future<void> _payWithAlipayH5(Order o) async {
     final api = context.read<AppState>().api;
     Map<String, dynamic> res;

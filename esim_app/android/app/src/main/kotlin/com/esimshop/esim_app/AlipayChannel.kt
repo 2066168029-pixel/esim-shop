@@ -1,24 +1,28 @@
 package com.esimshop.esim_app
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.alipay.sdk.app.PayTask
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executors
 
 /**
- * 支付宝安卓桥接。
+ * 支付宝安卓桥接 —— 官方 App 支付 SDK（alipaysdk-android 15.8.42）。
  *
- * 为什么是这个写法：
- *   官方 alipaysdk-android 是 AAR，但项目没引 Maven 仓库也不方便在 CI 里下载。
- *   安卓上拉起支付宝最稳的其实是「构造 intent 直接调起」：
- *     - 支付宝客户端装了：跳它自带的收银台，付完自己回到我们 app
- *     - 没装：跳 H5 收银台
- *   两条路最后都落到「服务端异步通知结算」，所以 app 这边只需要负责
- *   把用户送过去、再在回来时确认状态 —— 判断依据始终是服务端状态，
- *   不是客户端返回码。
+ * 之前那版是自己拼 `alipays://platformapi/startapp?...` 去跳转，手机上点下去
+ * 毫无反应：那个 scheme 需要服务器下发的完整 payload，自己拼的参数支付宝
+ * 客户端解析不了，于是直接静默失败。
  *
- * 这一点和 iOS 不同：iOS 必须用 SDK，因为 iOS 不允许随意拼 scheme 跳转。
+ * 现在改用官方 PayTask：
+ *   PayTask(activity).payV2(orderInfo, true)
+ *
+ * orderInfo 由服务端 alipay.trade.app.pay 签名产生（含 QUICK_MSECURITY_PAY），
+ * SDK 会负责唤起支付宝、收银台、以及支付完成后回到本 App。
+ *
+ * 关键约定：SDK 的返回码只用来提示用户，**是否真的收到钱以服务端异步通知为准**。
+ * 9000 也只说明支付宝那边走完了流程，最终仍要轮询 /alipay/status。
  */
 class AlipayChannel(
     private val activity: Activity,
@@ -28,62 +32,104 @@ class AlipayChannel(
     companion object {
         const val CHANNEL_NAME = "onlylink/alipay"
 
-        /** 支付宝客户端包名 */
-        private const val ALIPAY_PACKAGE = "com.eg.android.AlipayGphone"
-
-        /** 没装客户端时用的 H5 收银台 */
-        private const val H5_GATEWAY = "https://openapi.alipay.com/gateway.do"
+        /** 支付成功（仅表示支付宝端流程完成，仍需服务端确认） */
+        private const val STATUS_SUCCESS = "9000"
+        /** 用户主动取消 */
+        private const val STATUS_CANCEL = "6001"
+        /** 正在处理中，结果未知 */
+        private const val STATUS_PROCESSING = "8000"
     }
 
     private val main = Handler(Looper.getMainLooper())
 
-    override fun onMethodCall(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+    /**
+     * payV2 会阻塞，必须放在子线程。单线程池足够：同一时刻只允许一笔支付，
+     * 重复点击由 Dart 侧的 _busyPay 拦住。
+     */
+    private val executor = Executors.newSingleThreadExecutor()
+
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pay" -> {
-                val orderString = call.argument<String>("orderString") ?: ""
-                if (orderString.isEmpty()) {
-                    result.error("EMPTY", "orderString 为空", null)
+                val orderInfo = call.argument<String>("orderInfo")
+                    ?: call.argument<String>("orderString")
+                    ?: ""
+                if (orderInfo.isEmpty()) {
+                    result.error("EMPTY", "orderInfo 为空", null)
                     return
                 }
-                try {
-                    openAlipay(orderString)
-                    // 只回一个标记：真正付没付由服务端说了算
-                    result.success("launched")
-                } catch (t: Throwable) {
-                    result.error("LAUNCH_FAILED", t.message, null)
-                }
+                pay(orderInfo, result)
             }
+            "isInstalled" -> result.success(isAlipayInstalled())
             else -> result.notImplemented()
         }
     }
 
-    /**
-     * 调起支付宝。
-     *
-     * orderString 是服务端签名好的一串 key=value&sign=...，
-     * 支付宝自己解析它，我们只负责把它塞进 intent。
-     */
-    private fun openAlipay(orderString: String) {
-        // 1) 先试客户端
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setPackage(ALIPAY_PACKAGE)
-            addCategory(Intent.CATEGORY_BROWSABLE)
-            // 支付宝认这个 scheme 前缀
-            data = android.net.Uri.parse("alipays://platformapi/startapp?appId=20000067&url=" +
-                android.net.Uri.encode("$H5_GATEWAY?$orderString"))
+    private fun isAlipayInstalled(): Boolean {
+        return try {
+            activity.packageManager.getPackageInfo("com.eg.android.AlipayGphone", 0); true
+        } catch (_: Throwable) {
+            false
         }
-        if (intent.resolveActivity(activity.packageManager) != null) {
-            activity.startActivity(intent)
-            return
+    }
+
+    private fun pay(orderInfo: String, result: MethodChannel.Result) {
+        // 结果只回一次：payV2 返回后立即在主线程 resolve，避免重复回调。
+        val replied = java.util.concurrent.atomic.AtomicBoolean(false)
+        val reply: (Map<String, Any?>) -> Unit = { m ->
+            if (replied.compareAndSet(false, true)) {
+                main.post { result.success(m) }
+            }
         }
 
-        // 2) 没装客户端 —— 开浏览器走 H5
-        val web = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("$H5_GATEWAY?$orderString"))
-        web.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        activity.startActivity(web)
+        try {
+            executor.execute {
+                try {
+                    val payTask = PayTask(activity)
+                    @Suppress("UNCHECKED_CAST")
+                    val raw = payTask.payV2(orderInfo, true) as Map<String, String>
+
+                    val status = raw["resultStatus"] ?: ""
+                    reply(
+                        mapOf(
+                            "resultStatus" to status,
+                            "result" to (raw["result"] ?: ""),
+                            "memo" to (raw["memo"] ?: ""),
+                            // 语义化，Dart 侧不用记住支付宝的魔法数字
+                            "success" to (status == STATUS_SUCCESS),
+                            "cancelled" to (status == STATUS_CANCEL),
+                            "pending" to (status == STATUS_PROCESSING),
+                        )
+                    )
+                } catch (t: Throwable) {
+                    reply(
+                        mapOf(
+                            "resultStatus" to "error",
+                            "result" to "",
+                            "memo" to (t.message ?: "支付调用失败"),
+                            "success" to false,
+                            "cancelled" to false,
+                            "pending" to false,
+                        )
+                    )
+                }
+            }
+        } catch (t: Throwable) {
+            reply(
+                mapOf(
+                    "resultStatus" to "error",
+                    "result" to "",
+                    "memo" to (t.message ?: "无法启动支付线程"),
+                    "success" to false,
+                    "cancelled" to false,
+                    "pending" to false,
+                )
+            )
+        }
     }
 
     fun dispose() {
         main.removeCallbacksAndMessages(null)
+        executor.shutdownNow()
     }
 }

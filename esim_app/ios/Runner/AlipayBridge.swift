@@ -1,15 +1,16 @@
-// 支付宝 iOS 桥接
+// 支付宝 iOS 桥接 —— AlipaySDK.framework 15.8.42
 //
-// 为什么自己写而不是用 alipay_kit：
-//   项目已经有一个 Swift 的 MethodChannel 桥（NativeLpaBridge），
-//   沿用同一套结构，不额外引依赖，也不用改 Podfile 之外的东西。
+// 与 Android 侧 AlipayChannel 返回同样的结构，Dart 只写一套解析：
+//   {resultStatus, result, memo, success, cancelled, pending}
 //
 // 关键点：
-//   1. 支付宝的 SDK 需要 URL Scheme 才能跳回来 —— 在 Info.plist 里配
-//   2. 回调走 AppDelegate 的 open url，这里提供一个静态方法让 AppDelegate 转
+//   1. 必须配 URL Scheme（Info.plist CFBundleURLTypes），支付宝付完才能跳回来
+//   2. 回调走 AppDelegate 的 open url -> AlipayBridge.handleOpenURL
+//   3. 返回的 9000 **不代表到账**，到账以服务端异步通知为准
 //
-// 没有链接 AlipaySDK 时（比如还没装 Pod）这个文件会走 #if 分支，
-// 编译不会失败，Dart 侧收到 MissingPluginException 会退化成「只查状态」。
+// 没链接 AlipaySDK 时（framework 未加进工程）编译不报错，返回 NO_SDK，
+// Dart 侧会降级到 H5。
+
 import Flutter
 import UIKit
 
@@ -29,17 +30,27 @@ final class AlipayBridge: NSObject {
       switch call.method {
       case "pay":
         let args = call.arguments as? [String: Any]
-        let orderString = (args?["orderString"] as? String) ?? ""
-        self.pay(orderString: orderString, result: result)
+        // 兼容两个键名：新版 Dart 传 orderInfo，旧版传 orderString
+        let orderInfo = (args?["orderInfo"] as? String)
+          ?? (args?["orderString"] as? String)
+          ?? ""
+        self.pay(orderInfo: orderInfo, result: result)
+      case "isInstalled":
+        result(AlipayBridge.isAlipayInstalled())
       default:
         result(FlutterMethodNotImplemented)
       }
     }
   }
 
-  private func pay(orderString: String, result: @escaping FlutterResult) {
-    guard !orderString.isEmpty else {
-      result(FlutterError(code: "EMPTY", message: "orderString 为空", details: nil))
+  static func isAlipayInstalled() -> Bool {
+    guard let url = URL(string: "alipays://") else { return false }
+    return UIApplication.shared.canOpenURL(url)
+  }
+
+  private func pay(orderInfo: String, result: @escaping FlutterResult) {
+    guard !orderInfo.isEmpty else {
+      result(FlutterError(code: "EMPTY", message: "orderInfo 为空", details: nil))
       return
     }
 
@@ -52,7 +63,7 @@ final class AlipayBridge: NSObject {
       return
     }
 
-    // 同一次只能有一笔在飞；重复调用直接拒绝，避免把结果回调搞混
+    // 同一时刻只允许一笔在飞；重复调用直接拒绝，避免结果回调串台
     if pendingResult != nil {
       result(FlutterError(code: "BUSY", message: "上一笔支付还没结束", details: nil))
       return
@@ -60,13 +71,13 @@ final class AlipayBridge: NSObject {
     pendingResult = result
 
     AlipaySDK.defaultService().payOrder(
-      orderString, fromScheme: scheme, callback: { [weak self] res in
+      orderInfo, fromScheme: scheme, callback: { [weak self] res in
         self?.finish(res)
       })
     #else
     result(FlutterError(
       code: "NO_SDK",
-      message: "未链接 AlipaySDK，请在 Podfile 加入 pod 'AlipaySDK-iOS'",
+      message: "未链接 AlipaySDK：请把 AlipaySDK.framework 加进 Runner target",
       details: nil))
     #endif
   }
@@ -76,17 +87,72 @@ final class AlipayBridge: NSObject {
   func finish(_ resultInfo: [AnyHashable: Any]?) -> Bool {
     guard let pending = pendingResult else { return false }
     pendingResult = nil
+
     guard let info = resultInfo else {
-      pending(nil)
+      pending([
+        "resultStatus": "error",
+        "result": "",
+        "memo": "支付没有返回结果",
+        "success": false,
+        "cancelled": false,
+        "pending": false,
+      ])
       return true
     }
-    // memo / result 两种形态都有；取能拿到的那个
-    let memo = info["memo"] as? [String: Any]
-    let resultDict = info["result"] as? [String: Any] ?? memo
-    let status = (resultDict?["resultStatus"] as? String)
-      ?? (resultDict?["ResultStatus"] as? String)
-      ?? ""
-    pending(status)
+
+    // SDK 给的字典形状随版本变化：有时在 memo 里，有时在 result 里，
+    // 值是 JSON 字符串也可能是 Dictionary。逐层剥，最后兜底整体转字符串。
+    var status = ""
+    var memoText = ""
+    var resultText = ""
+
+    func pick(_ obj: Any?) {
+      guard let obj else { return }
+      if let d = obj as? [String: Any] {
+        if status.isEmpty {
+          status = (d["resultStatus"] as? String)
+            ?? (d["ResultStatus"] as? String)
+            ?? ""
+        }
+        if memoText.isEmpty, let m = d["memo"] as? String, m != "[do not call]" {
+          memoText = m
+        }
+        if resultText.isEmpty, let r = d["result"] as? String {
+          resultText = r
+        }
+        // result 里可能还嵌一层
+        if let inner = d["result"] as? [String: Any] {
+          pick(inner)
+        } else if let s = d["result"] as? String,
+                  let data = s.data(using: .utf8),
+                  let j = try? JSONSerialization.jsonObject(with: data) {
+          pick(j)
+        }
+      } else if let s = obj as? String, status.isEmpty {
+        // 有的版本直接给 JSON 字符串
+        if let data = s.data(using: .utf8),
+           let j = try? JSONSerialization.jsonObject(with: data) {
+          pick(j)
+        }
+      }
+    }
+
+    pick(info["result"])
+    pick(info["memo"])
+    pick(info)
+
+    if status.isEmpty {
+      status = (info["resultStatus"] as? String) ?? "error"
+    }
+
+    pending([
+      "resultStatus": status,
+      "result": resultText,
+      "memo": memoText,
+      "success": status == "9000",
+      "cancelled": status == "6001",
+      "pending": status == "8000",
+    ])
     return true
   }
 
@@ -123,5 +189,16 @@ final class AlipayBridge: NSObject {
     return nil
   }
 
-  func registerAsShared() { AlipayBridge.shared = self }
+  func registerAsShared() {
+    AlipayBridge.shared = self
+    #if canImport(AlipaySDK)
+    // Xcode 26 之后需要业务自己指定 window，否则收银台可能弹不出来
+    if let window = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene })
+      .flatMap({ $0.windows })
+      .first(where: { $0.isKeyWindow }) {
+      AlipaySDK.defaultService().targetWindow = window
+    }
+    #endif
+  }
 }

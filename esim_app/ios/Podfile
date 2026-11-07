@@ -36,7 +36,10 @@ target 'Runner' do
 
   # 支付宝 App 支付。走官方 SDK 才能拿到「付完自动跳回 App」的 URL 回调；
   # 只用 url_launcher 打开网页是收不到结果的。
-  pod 'AlipaySDK-iOS'
+  # Alipay App-pay SDK. CocoaPods trunk stops at 15.8.30; the official
+  # download is 15.8.42, so the framework is vendored under ios/Frameworks
+  # with a local podspec.
+  pod 'AlipaySDK', :path => 'Frameworks'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do

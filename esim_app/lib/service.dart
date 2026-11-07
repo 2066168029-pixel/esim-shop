@@ -67,6 +67,23 @@ class ApiService {
     return (j as Map)["status"] as String? ?? "";
   }
 
+  /// Create an Alipay **App-pay** order.
+  ///
+  /// Returns `{order_info, amount, currency}`. `order_info` is the signed string
+  /// the native SDK consumes (PayTask.payV2 on Android, AlipaySDK on iOS).
+  /// Prefer this over [alipayCreate] on mobile: the H5 cashier is only a
+  /// launcher page and blanks out inside a WebView on real devices.
+  Future<Map<String, dynamic>> alipayAppCreate(
+    String orderNo, {
+    String subject = "",
+  }) async {
+    final j = await _c.post("/api/payments/alipay/app-create", auth: true, body: {
+      "order_no": orderNo,
+      if (subject.isNotEmpty) "subject": subject,
+    });
+    return (j as Map).cast<String, dynamic>();
+  }
+
   /// Create a Stripe Checkout Session for a pending order.
   ///
   /// Returns `{url, session_id, amount, currency}`. The app opens `url` in a

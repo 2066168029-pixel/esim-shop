@@ -67,6 +67,30 @@ class ApiService {
     return (j as Map)["status"] as String? ?? "";
   }
 
+  /// Create a Stripe Checkout Session for a pending order.
+  ///
+  /// Returns `{url, session_id, amount, currency}`. The app opens `url` in a
+  /// WebView and waits for the Stripe webhook to settle the order, so the
+  /// result is confirmed by polling [stripeStatus].
+  Future<Map<String, dynamic>> stripeCreate(
+    String orderNo, {
+    String successUrl = "https://www.onlylinkcard.com/pay/success",
+    String cancelUrl = "https://www.onlylinkcard.com/pay/cancel",
+  }) async {
+    final j = await _c.post("/api/payments/stripe/create", auth: false, body: {
+      "order_no": orderNo,
+      "success_url": successUrl,
+      "cancel_url": cancelUrl,
+    });
+    return (j as Map).cast<String, dynamic>();
+  }
+
+  /// Poll the settlement state of a Stripe order (public, no token).
+  Future<String> stripeStatus(String orderNo) async {
+    final j = await _c.get("/api/payments/stripe/status", q: {"order_no": orderNo});
+    return (j as Map)["status"] as String? ?? "";
+  }
+
   /// Start an Alipay Global (Antom) payment for a pending order.
   ///
   /// Returns `{normal_url, applink_url, client_secret, payment_id, amount,

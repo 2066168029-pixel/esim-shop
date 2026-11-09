@@ -25,7 +25,18 @@ class OrderDetailScreen extends StatefulWidget {
   /// find "pay now" again after placing the order.
   final String autoPay;
 
-  const OrderDetailScreen({super.key, required this.orderNo, this.autoPay = ''});
+  /// When true, the screen closes itself once the order reaches a paid state
+  /// and pops `true`. The BLE card writer uses this so a quota purchase returns
+  /// straight to the writer, which then refreshes the slot allowance. Normal
+  /// navigation leaves it false and behaves exactly as before.
+  final bool popOnPaid;
+
+  const OrderDetailScreen({
+    super.key,
+    required this.orderNo,
+    this.autoPay = '',
+    this.popOnPaid = false,
+  });
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
@@ -60,8 +71,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           if (mounted) _payWithAlipayH5(o);
         });
       }
+      _popIfPaid();
     } catch (e) {
       setState(() => _err = '$e');
+    }
+  }
+
+  /// Close the screen and report success once the order has settled.
+  ///
+  /// Only active when the caller asked for it ([OrderDetailScreen.popOnPaid]).
+  void _popIfPaid() {
+    if (!widget.popOnPaid || !mounted) return;
+    final st = _order?.status;
+    if (st == 'paid' || st == 'fulfilled') {
+      Navigator.of(context).pop(true);
     }
   }
 

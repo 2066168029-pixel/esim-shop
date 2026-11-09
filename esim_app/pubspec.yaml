@@ -2,7 +2,7 @@
 description: "eSIM Shop - 閸?eSIM 娑撳骸鐤勬担?SIM 閸楋紕娈戦幍瀣簚 App"
 publish_to: 'none'
 
-version: 1.6.2+152
+version: 1.6.3+153
 
 environment:
   sdk: ^3.13.5

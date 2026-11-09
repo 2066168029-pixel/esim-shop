@@ -15,6 +15,7 @@ import '../job_executor.dart';
 import '../lpad_ble.dart' as vendor;
 import '../lpad_errors.dart';
 import '../store.dart';
+import 'order_detail_screen.dart';
 
 /// Stable identity for a profile operation on the vendor-SDK path.
 ///
@@ -1595,9 +1596,8 @@ class _CardWriterScreenV2State extends State<CardWriterScreenV2> {
           _appendInfo('支付未完成，可在「我的订单」继续支付');
         }
       } else if (gateway.provider == 'paypal') {
-        // Only PayPal has a live create/capture flow server-side. Every other
-        // channel is a display-only record, so sending the customer there
-        // would strand a pending order.
+        // PayPal is a single external redirect, so it can be started straight
+        // from here without leaving the card writer.
         final res = await state.api.paypalCreate(order.orderNo);
         final url = res['approve_url'] as String? ?? '';
         if (url.isEmpty) {
@@ -1610,7 +1610,24 @@ class _CardWriterScreenV2State extends State<CardWriterScreenV2> {
         }
         _appendInfo('请在 PayPal 完成付款，返回后在下拉刷新配额');
       } else {
-        _appendInfo('待完成支付后生效，可在「我的订单」继续支付');
+        // Alipay / Stripe / Antom each need a different hand-off (native SDK,
+        // hosted checkout, app scheme). OrderDetailScreen already implements
+        // all of them, so route there instead of dead-ending with a toast --
+        // the previous version only printed a line and left the order
+        // unpaid until it was auto-cancelled after 15 minutes.
+        _appendInfo('请完成支付，付款后额度自动增加');
+        if (!mounted) return;
+        final paid = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(
+              orderNo: order.orderNo,
+              popOnPaid: true,
+            ),
+          ),
+        );
+        if (!mounted) return;
+        if (paid == true) await _refreshQuota();
       }
     } catch (e) {
       _appendInfo('扩容下单失败：$e');

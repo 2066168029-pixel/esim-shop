@@ -39,8 +39,15 @@ jobs:
       # Mirrors match the mirror used by the local pub cache (pub.flutter-io.cn).
       # Override via repository variables if your runner can reach the
       # official registries directly.
-      PUB_HOSTED_URL: ${{ vars.PUB_HOSTED_URL || 'https://pub.dev' }}
-      FLUTTER_STORAGE_BASE_URL: ${{ vars.FLUTTER_STORAGE_BASE_URL || 'https://storage.googleapis.com' }}
+      # 默认指向国内镜像：pubspec.lock 里的依赖全部记录为
+      # https://pub.flutter-io.cn，而 --enforce-lockfile 会校验源地址与
+      # sha256，用官方源会直接报 "Unable to satisfy pubspec.yaml using
+      # pubspec.lock"。两侧必须用同一个源。
+      # 如 runner 能直连官方源，用 repository variable 覆盖即可：
+      #   PUB_HOSTED_URL=https://pub.dev
+      #   FLUTTER_STORAGE_BASE_URL=https://storage.googleapis.com
+      PUB_HOSTED_URL: ${{ vars.PUB_HOSTED_URL || 'https://pub.flutter-io.cn' }}
+      FLUTTER_STORAGE_BASE_URL: ${{ vars.FLUTTER_STORAGE_BASE_URL || 'https://storage.flutter-io.cn' }}
       COCOAPODS_DISABLE_STATS: 'true'
 
     steps:

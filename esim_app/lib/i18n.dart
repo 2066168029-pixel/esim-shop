@@ -60,8 +60,8 @@ class L {
   String get activateEsim => _t({AppLang.en: 'Activate eSIM', AppLang.zh: '激活 eSIM', AppLang.ja: 'eSIM をアクティベート', AppLang.ko: 'eSIM 활성화', AppLang.th: 'เปิดใช้งาน eSIM', AppLang.vi: 'Kích hoạt eSIM'});
   String get scanYourQr => _t({AppLang.en: 'Scan Your QR Code', AppLang.zh: '扫描你的二维码', AppLang.ja: 'QR コードをスキャン', AppLang.ko: 'QR 코드 스캔', AppLang.th: 'สแกน QR ของคุณ', AppLang.vi: 'Quét mã QR'});
   String get cameraRequired => _t({AppLang.en: 'Camera access required', AppLang.zh: '需要相机权限', AppLang.ja: 'カメラ権限が必要', AppLang.ko: '카메라 권한 필요', AppLang.th: 'ต้องเข้าถึงกล้อง', AppLang.vi: 'Cần quyền camera'});
-  String get enterCode => _t({AppLang.en: 'Enter ICCID', AppLang.zh: '输入 ICCID', AppLang.ja: 'ICCID を入力', AppLang.ko: 'ICCID 입력', AppLang.th: 'ป้อน ICCID', AppLang.vi: 'Nhập ICCID'});
-  String get typeCode => _t({AppLang.en: 'Enter your ICCID', AppLang.zh: '请输入您的 ICCID', AppLang.ja: 'ICCID を入力してください', AppLang.ko: 'ICCID를 입력하세요', AppLang.th: 'กรอก ICCID ของคุณ', AppLang.vi: 'Nhập ICCID của bạn'});
+  String get enterCode => _t({AppLang.en: 'Enter device or card number', AppLang.zh: '输入设备号或卡号', AppLang.ja: 'デバイス番号またはカード番号を入力', AppLang.ko: '기기 번호 또는 카드 번호 입력', AppLang.th: 'ป้อนหมายเลขอุปกรณ์หรือหมายเลขการ์ด', AppLang.vi: 'Nhập số thiết bị hoặc số thẻ'});
+  String get typeCode => _t({AppLang.en: 'Enter your device or card number', AppLang.zh: '请输入您的设备号或卡号', AppLang.ja: 'デバイス番号またはカード番号を入力してください', AppLang.ko: '기기 번호 또는 카드 번호를 입력하세요', AppLang.th: 'ป้อนหมายเลขอุปกรณ์หรือหมายเลขการ์ดของคุณ', AppLang.vi: 'Nhập số thiết bị hoặc số thẻ của bạn'});
   String get confirmBtn => _t({AppLang.en: 'Confirm', AppLang.zh: '确认', AppLang.ja: '確認', AppLang.ko: '확인', AppLang.th: 'ยืนยัน', AppLang.vi: 'Xác nhận'});
   String get stepScan => _t({AppLang.en: 'Scan', AppLang.zh: '扫码', AppLang.ja: 'スキャン', AppLang.ko: '스캔', AppLang.th: 'สแกน', AppLang.vi: 'Quét'});
   String get stepConfirm => _t({AppLang.en: 'Confirm', AppLang.zh: '确认', AppLang.ja: '確認', AppLang.ko: '확인', AppLang.th: 'ยืนยัน', AppLang.vi: 'Xác nhận'});

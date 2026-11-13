@@ -257,9 +257,6 @@ class _AccountScreenState extends State<AccountScreen> {
                   }
                 }),
                 const SizedBox(width: 10),
-                _actionCard(context, Icons.account_balance_wallet_rounded, t.payment, AppColors.success,
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentPage()))),
-                const SizedBox(width: 10),
                 _actionCard(context, Icons.replay_rounded, t.rechargeRecords, AppColors.warn, () async {
                   if (!app.isLoggedIn) {
                     await _requireSignIn(context, t);

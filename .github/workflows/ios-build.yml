@@ -215,11 +215,19 @@ jobs:
       - name: Patch plugin Swift for older toolchain
         run: |
           set -euo pipefail
-          PKG="$HOME/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.6.0"
+          # 不写死源目录和版本号：PUB_HOSTED_URL 可能是 pub.dev 也可能是
+          # pub.flutter-io.cn，版本也会随 pubspec.lock 变化。动态定位。
+          PKG=$(find "$HOME/.pub-cache/hosted" -maxdepth 3 -type d -name 'shared_preferences_foundation-*' | sort -V | tail -1)
+          if [ -z "$PKG" ]; then
+            echo "ERROR: shared_preferences_foundation not found in pub cache" >&2
+            find "$HOME/.pub-cache/hosted" -maxdepth 3 -type d -name 'shared_preferences_*' || true
+            exit 1
+          fi
+          echo "Using package: $PKG"
           TARGET="$PKG/darwin/shared_preferences_foundation/Sources/shared_preferences_foundation/messages.g.swift"
           if [ ! -f "$TARGET" ]; then
-            echo "Target not found, searching pub cache:"
-            find "$HOME/.pub-cache/hosted" -maxdepth 3 -type d -name 'shared_preferences_foundation-*' || true
+            echo "ERROR: messages.g.swift not found at $TARGET" >&2
+            find "$PKG" -name 'messages.g.swift' || true
             exit 1
           fi
           echo "Before: $(grep -c ',$' "$TARGET" || true) lines end with a comma"

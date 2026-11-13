@@ -32,7 +32,8 @@ class ApiConfig {
   static const _emulator = bool.fromEnvironment('EMULATOR');
 
   /// Deployed shop backend.
-  static const String productionBaseUrl = "http://8.218.203.94:8100";
+  /// 后端与后台同域，走 HTTPS（nginx 反代到本机 8100）。
+  static const String productionBaseUrl = "https://app.zkm4m.cn";
 
   static String get baseUrl {
     if (_override.isNotEmpty) return _override;

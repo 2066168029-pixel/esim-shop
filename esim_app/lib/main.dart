@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'api.dart';
+import 'app_monitor.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'updater.dart';
@@ -45,6 +46,10 @@ class _GateState extends State<_Gate> {
   @override
   void initState() {
     super.initState();
+    // 匿名设备心跳：供后台「数据大屏」展示在线数与分布。
+    // 失败静默，不影响启动。
+    AppMonitor.instance.start();
+
     // Check for an app update once, shortly after first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await Future.delayed(const Duration(seconds: 2));
